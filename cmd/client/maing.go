@@ -23,11 +23,13 @@ func main() {
 	gtk.Init(nil)
 
 	win2, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
+	win2.SetResizable(false)
+	win2.SetDecorated(false)
 	if err != nil {
 		log.Fatal("Unable to create window:", err)
 	}
-	win2.Move(500, 0)
-	tk := time.NewTicker(30 * time.Millisecond)
+	win2.Move(1150, 0)
+	tk := time.NewTicker((1000 / 30) * time.Millisecond)
 	done := make(chan bool)
 
 	win2.Connect("destroy", func() {
@@ -61,7 +63,7 @@ var frames int64 = 0
 
 func setImage() {
 	start := time.Now()
-	screen, _ := screenshot.Capture(0, 0, 500, 500)
+	screen, _ := screenshot.Capture(0, 1440, 500, 500)
 	buffer, _ = gdk.PixbufNewFromData(screen.Pix, gdk.COLORSPACE_RGB, true, 8, 500, 500, 2000)
 
 	_, err := glib.IdleAdd(img.SetFromPixbuf, buffer)

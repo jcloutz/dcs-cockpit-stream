@@ -35,15 +35,19 @@ func NewServerViewport(name string, x int, y int, width int, height int) *Server
 type ServerViewportManager struct {
 	viewports      map[string]*ServerViewport
 	capture        ScreenCapper
+	targetFps      int
 	computedBounds image.Rectangle
 	done           chan bool
 	timer          *time.Ticker
+
+	fps int
 }
 
-func NewServerViewportManager(screenCapper ScreenCapper) *ServerViewportManager {
+func NewServerViewportManager(screenCapper ScreenCapper, targetFps int) *ServerViewportManager {
 	return &ServerViewportManager{
 		viewports: make(map[string]*ServerViewport),
 		capture:   screenCapper,
+		targetFps: targetFps,
 	}
 }
 
@@ -102,19 +106,19 @@ func (vm *ServerViewportManager) updateViewports() {
 		save(vp.image, fmt.Sprintf("output/%s.png", name))
 	}
 }
-func (vm *ServerViewportManager) benchmark() int64 {
-	iterations := 60
+
+func (vm *ServerViewportManager) benchmark() (int, int) {
+	iterations := 120
 	start := time.Now()
 	for i := 0; i < iterations; i++ {
 		_ = vm.capture.Update(vm.computedBounds)
 	}
 	end := time.Now()
 
-	f := end.Sub(start).Milliseconds()
-	f += 1
-	avg := end.Sub(start).Milliseconds() / int64(iterations)
+	avgTime := end.Sub(start).Milliseconds() / int64(iterations)
+	maxFps := 1000 / avgTime
 
-	return avg
+	return int(avgTime), int(maxFps)
 
 }
 
@@ -130,16 +134,22 @@ func (vm *ServerViewportManager) run() {
 			return
 		}
 	}
-
 }
 
 func (vm *ServerViewportManager) Run() {
 	fmt.Println("Running benchmark")
-	result := vm.benchmark()
-	fmt.Printf("\tAvg Capture time: %dms\n", result)
-	fmt.Printf("\tMax FPS: %dfps\n", 1000/(result+10))
+	avgTime, maxFps := vm.benchmark()
+	fmt.Printf("\tAvg Capture time: %dms\n", avgTime)
+	fmt.Printf("\tMax FPS: %dfps\n", 1000/(avgTime))
+
+	if maxFps > vm.targetFps {
+		vm.fps = vm.targetFps
+	} else {
+		vm.fps = maxFps
+	}
+	fmt.Printf("\tTarget FPS: %dfps\n", vm.fps)
 
 	vm.done = make(chan bool)
-	vm.timer = time.NewTicker(time.Duration(result+10) * time.Millisecond)
+	vm.timer = time.NewTicker(time.Duration(1000/vm.fps) * time.Millisecond)
 	go vm.run()
 }

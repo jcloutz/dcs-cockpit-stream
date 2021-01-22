@@ -17,7 +17,7 @@ func main() {
 	}
 
 	screenCapture := cockpit_stream.NewScreenCapture()
-	viewportManager := cockpit_stream.NewServerViewportManager(screenCapture)
+	viewportManager := cockpit_stream.NewServerViewportManager(screenCapture, cfg.FramesPerSecond)
 	for _, vp := range cfg.Viewports {
 		viewportManager.AddNewViewport(
 			vp.ID,
