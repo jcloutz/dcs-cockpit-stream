@@ -2,17 +2,15 @@ package cockpit_stream
 
 import (
 	"encoding/binary"
-	"fmt"
 	"image"
 	"image/draw"
 	"image/png"
 	"math/rand"
 	"os"
-	"sync"
 	"time"
 )
 
-func save(img *image.RGBA, filePath string) {
+func Save(img *image.RGBA, filePath string) {
 	file, err := os.Create(filePath)
 	if err != nil {
 		panic(err)
@@ -237,70 +235,70 @@ func appendMethod2(compressed []uint8) {
 //	capturer.Stop()
 //}
 
-func executeMutexScreenCap() {
-
-	b1 := image.Rect(0, 0, 50, 50)
-	b2 := image.Rect(50, 50, 100, 100)
-	//img1 := image.NewRGBA(b1)
-	//img2 := image.NewRGBA(b2)
-	//screenshot.CaptureDisplay(0);
-	bounds := b1.Union(b2)
-
-	bounds = image.Rect(0, 0, 100, 100)
-	const fps int = 30
-	const screens int = 1
-	const frameCount = fps * 1
-	capturer := New(&bounds, fps)
-
-	capturer.Start()
-	var wg sync.WaitGroup
-	//time.Sleep(2 * time.Second)
-	for scr := 1; scr <= screens; scr++ {
-		b := image.Rect(0, 0, 500, 500)
-		img := image.NewRGBA(b)
-		wg.Add(1)
-		var curIdx int64 = -1
-		go func(idx int, wg *sync.WaitGroup) {
-			defer wg.Done()
-			start := time.Now()
-			i := 0
-			for i < frameCount {
-				startFrame := time.Now()
-				if capturer.Index() > curIdx {
-					capIdx := capturer.GetScreen(img, &b)
-					curIdx = capIdx
-					i++
-					//fmt.Printf("[%d]--- COPY FRAME %d ---\n", idx, curIdx)
-					elapsed := time.Now().Sub(startFrame).Milliseconds()
-					time.Sleep(time.Duration((1000/fps)-int(elapsed)) * time.Millisecond)
-				}
-			}
-			elapsed := time.Now().Sub(start)
-			fmt.Printf("img[%d]: %f fps\n", idx, float64(frameCount)/elapsed.Seconds())
-		}(scr, &wg)
-
-	}
-	wg.Wait()
-	//go func() {
-	//	start := time.Now()
-	//	for i := 0; i < 120; i++ {
-	//		capturer.GetScreen(img1, &b1)
-	//		time.Sleep(17 * time.Millisecond)
-	//	}
-	//	elapsed := time.Now().Sub(start)
-	//	fmt.Printf("img1: %f fps", float64(120)/elapsed.Seconds())
-	//}()
-	//go func() {
-	//	start := time.Now()
-	//	for i := 0; i < 120; i++ {
-	//		capturer.GetScreen(img2, &b2)
-	//		time.Sleep(17 * time.Millisecond)
-	//	}
-	//	elapsed := time.Now().Sub(start)
-	//	fmt.Printf("img1: %f fps", float64(120)/elapsed.Seconds())
-	//}()
-
-	fmt.Println("Stopping")
-	capturer.Stop()
-	fmt.Println("Shutting down")
-}
+//func executeMutexScreenCap() {
+//
+//	b1 := image.Rect(0, 0, 50, 50)
+//	b2 := image.Rect(50, 50, 100, 100)
+//	//img1 := image.NewRGBA(b1)
+//	//img2 := image.NewRGBA(b2)
+//	//screenshot.CaptureDisplay(0);
+//	bounds := b1.Union(b2)
+//
+//	bounds = image.Rect(0, 0, 100, 100)
+//	const fps int = 30
+//	const screens int = 1
+//	const frameCount = fps * 1
+//	capturer := New(&bounds, fps)
+//
+//	capturer.Start()
+//	var wg sync.WaitGroup
+//	//time.Sleep(2 * time.Second)
+//	for scr := 1; scr <= screens; scr++ {
+//		b := image.Rect(0, 0, 500, 500)
+//		img := image.NewRGBA(b)
+//		wg.Add(1)
+//		var curIdx int64 = -1
+//		go func(idx int, wg *sync.WaitGroup) {
+//			defer wg.Done()
+//			start := time.Now()
+//			i := 0
+//			for i < frameCount {
+//				startFrame := time.Now()
+//				if capturer.Index() > curIdx {
+//					capIdx := capturer.GetScreen(img, &b)
+//					curIdx = capIdx
+//					i++
+//					//fmt.Printf("[%d]--- COPY FRAME %d ---\n", idx, curIdx)
+//					elapsed := time.Now().Sub(startFrame).Milliseconds()
+//					time.Sleep(time.Duration((1000/fps)-int(elapsed)) * time.Millisecond)
+//				}
+//			}
+//			elapsed := time.Now().Sub(start)
+//			fmt.Printf("img[%d]: %f fps\n", idx, float64(frameCount)/elapsed.Seconds())
+//		}(scr, &wg)
+//
+//	}
+//	wg.Wait()
+//	//go func() {
+//	//	start := time.Now()
+//	//	for i := 0; i < 120; i++ {
+//	//		capturer.GetScreen(img1, &b1)
+//	//		time.Sleep(17 * time.Millisecond)
+//	//	}
+//	//	elapsed := time.Now().Sub(start)
+//	//	fmt.Printf("img1: %f fps", float64(120)/elapsed.Seconds())
+//	//}()
+//	//go func() {
+//	//	start := time.Now()
+//	//	for i := 0; i < 120; i++ {
+//	//		capturer.GetScreen(img2, &b2)
+//	//		time.Sleep(17 * time.Millisecond)
+//	//	}
+//	//	elapsed := time.Now().Sub(start)
+//	//	fmt.Printf("img1: %f fps", float64(120)/elapsed.Seconds())
+//	//}()
+//
+//	fmt.Println("Stopping")
+//	capturer.Stop()
+//	fmt.Println("Shutting down")
+//}

@@ -12,47 +12,64 @@ import (
 )
 
 var (
-	topLabel    *gtk.Label
-	bottomLabel *gtk.Label
-	img         *gtk.Image
-	nSets       = 1
-	buffer      *gdk.Pixbuf
+	leftImg     *gtk.Image
+	rightImg    *gtk.Image
+	leftBuffer  *gdk.Pixbuf
+	rightBuffer *gdk.Pixbuf
 )
 
 func main() {
 	gtk.Init(nil)
 
-	win2, err := gtk.WindowNew(gtk.WINDOW_TOPLEVEL)
-	win2.SetResizable(false)
-	win2.SetDecorated(false)
+	tk := time.NewTicker((1000 / 30) * time.Millisecond)
+	leftDone := make(chan bool)
+	//rightDone := make(chan bool)
+
+	win1, err := gtk.WindowNew(gtk.WINDOW_POPUP)
 	if err != nil {
 		log.Fatal("Unable to create window:", err)
 	}
-	win2.Move(1150, 0)
-	tk := time.NewTicker((1000 / 30) * time.Millisecond)
-	done := make(chan bool)
+	win1.SetResizable(false)
+	win1.SetDecorated(false)
+	win1.Move(1150, 0)
 
-	win2.Connect("destroy", func() {
-		done <- true
+	win1.Connect("destroy", func() {
+		//rightDone <- true
 		gtk.MainQuit()
 	})
 
-	win2.Add(windowWidget2())
+	win2, err := gtk.WindowNew(gtk.WINDOW_POPUP)
+	if err != nil {
+		log.Fatal("Unable to create window:", err)
+	}
+	win2.SetResizable(false)
+	win2.SetDecorated(false)
+	win2.Move(650, 0)
+
+	win2.Connect("destroy", func() {
+		leftDone <- true
+		gtk.MainQuit()
+	})
+
+	win1.Add(rightWindowWidget())
+	win2.Add(leftWindowWidget())
 
 	go func() {
 		for {
 			select {
 			case <-tk.C:
-				go setImage()
-			case <-done:
+				go setLeftImage()
+				go setRightImage()
+			case <-leftDone:
 				fmt.Println("Closing")
 				tk.Stop()
-				close(done)
+				close(leftDone)
 				return
 			}
 		}
 	}()
 
+	win1.ShowAll()
 	win2.ShowAll()
 
 	gtk.Main()
@@ -61,12 +78,12 @@ func main() {
 var elapsed int64 = 0
 var frames int64 = 0
 
-func setImage() {
+func setRightImage() {
 	start := time.Now()
-	screen, _ := screenshot.Capture(0, 1440, 500, 500)
-	buffer, _ = gdk.PixbufNewFromData(screen.Pix, gdk.COLORSPACE_RGB, true, 8, 500, 500, 2000)
+	screen, _ := screenshot.Capture(500, 1440, 500, 500)
+	rightBuffer, _ = gdk.PixbufNewFromData(screen.Pix, gdk.COLORSPACE_RGB, true, 8, 500, 500, 2000)
 
-	_, err := glib.IdleAdd(img.SetFromPixbuf, buffer)
+	_, err := glib.IdleAdd(rightImg.SetFromPixbuf, rightBuffer)
 	if err != nil {
 		log.Fatal("IdleAdd() image failed:", err)
 	}
@@ -75,17 +92,46 @@ func setImage() {
 	frames++
 
 	if frames%100 == 0 {
-		fmt.Printf("avg frame time: %dms\n", elapsed/frames)
+		fmt.Printf("Right: avg frame time: %dms\n", elapsed/frames)
 	}
 }
 
-func windowWidget2() *gtk.Widget {
-	img, _ = gtk.ImageNew()
+func setLeftImage() {
+	start := time.Now()
+	screen, _ := screenshot.Capture(0, 1440, 500, 500)
+	leftBuffer, _ = gdk.PixbufNewFromData(screen.Pix, gdk.COLORSPACE_RGB, true, 8, 500, 500, 2000)
 
-	setImage()
+	_, err := glib.IdleAdd(leftImg.SetFromPixbuf, leftBuffer)
+	if err != nil {
+		log.Fatal("IdleAdd() image failed:", err)
+	}
+	end := time.Now().Sub(start).Milliseconds()
+	elapsed += end
+	frames++
 
-	img.SetHExpand(true)
-	img.SetVExpand(true)
+	if frames%100 == 0 {
+		fmt.Printf("Left: avg frame time: %dms\n", elapsed/frames)
+	}
+}
 
-	return img.ToWidget()
+func leftWindowWidget() *gtk.Widget {
+	leftImg, _ = gtk.ImageNew()
+
+	setLeftImage()
+
+	leftImg.SetHExpand(true)
+	leftImg.SetVExpand(true)
+
+	return leftImg.ToWidget()
+}
+
+func rightWindowWidget() *gtk.Widget {
+	rightImg, _ = gtk.ImageNew()
+
+	setRightImage()
+
+	rightImg.SetHExpand(true)
+	rightImg.SetVExpand(true)
+
+	return rightImg.ToWidget()
 }
