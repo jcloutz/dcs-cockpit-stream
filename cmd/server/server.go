@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image"
 	"log"
 	"os"
 	"os/signal"
@@ -34,14 +33,13 @@ func main() {
 	}
 	//viewportManager.Run()
 
-	listener := make(chan *cockpit_stream.ViewportListenerResult)
-	sm := cockpit_stream.NewHostScreenManager(func(smConfig *cockpit_stream.HostScreenManagerConfig) {
+	listener := make(chan *cockpit_stream.ScreenCaptureResult)
+	sm := cockpit_stream.NewHostScreenManager(func(smConfig *cockpit_stream.ScreenCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
-		smConfig.ScreenCapper = screenCapture
-		smConfig.ViewportManager = viewportManager
 	})
 
-	sm.OnCaptureUpdate(listener)
+	sm.AddListener(listener)
+	sm.SetBounds(viewportManager.GetBounds())
 	sm.Start()
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
@@ -49,39 +47,39 @@ func main() {
 	go func() {
 		start := time.Now()
 		count := 0
-		size := 500
-		sizeRec := image.Rect(0, 0, size, size)
-		leftImg := image.NewRGBA(sizeRec)
-		centerImg := image.NewRGBA(sizeRec)
-		rightImg := image.NewRGBA(sizeRec)
+		//size := 500
+		//sizeRec := image.Rect(0, 0, size, size)
+		//leftImg := image.NewRGBA(sizeRec)
+		//centerImg := image.NewRGBA(sizeRec)
+		//rightImg := image.NewRGBA(sizeRec)
 		for {
 			select {
 			case res := <-listener:
 				count++
-				go func() {
-					left, err := res.Viewports.Get("left")
-					if err != nil {
-						log.Println(err)
-					}
-					left.Slice(leftImg, sizeRec, image.Point{X: 0, Y: 0})
-				}()
-				go func() {
-					right, err := res.Viewports.Get("right")
-					if err != nil {
-						log.Println(err)
-					}
-					right.Slice(centerImg, sizeRec, image.Point{X: 0, Y: 0})
-				}()
-				go func() {
-					center, err := res.Viewports.Get("center")
-					if err != nil {
-						log.Println(err)
-					}
-					center.Slice(rightImg, sizeRec, image.Point{X: 0, Y: 0})
-				}()
+				//go func() {
+				//	left, err := res.Viewports.Get("left")
+				//	if err != nil {
+				//		log.Println(err)
+				//	}
+				//	left.Slice(leftImg, sizeRec, image.Point{X: 0, Y: 0})
+				//}()
+				//go func() {
+				//	right, err := res.Viewports.Get("right")
+				//	if err != nil {
+				//		log.Println(err)
+				//	}
+				//	right.Slice(centerImg, sizeRec, image.Point{X: 0, Y: 0})
+				//}()
+				//go func() {
+				//	center, err := res.Viewports.Get("center")
+				//	if err != nil {
+				//		log.Println(err)
+				//	}
+				//	center.Slice(rightImg, sizeRec, image.Point{X: 0, Y: 0})
+				//}()
 
-				close(quit)
-				done <- true
+				//close(quit)
+				//done <- true
 				if count%100 == 0 {
 					elapsed := time.Now().Sub(res.T)
 					elapsedTotal := time.Now().Sub(start)

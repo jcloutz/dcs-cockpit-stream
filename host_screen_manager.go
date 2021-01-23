@@ -1,76 +1,90 @@
 package cockpit_stream
 
 import (
+	"github.com/kbinani/screenshot"
+	"image"
+	"image/draw"
+	"sync"
 	"time"
 )
 
-type ViewportListenerResult struct {
-	Viewports ViewportContainerReader
-	T         time.Time
+type ScreenCaptureResult struct {
+	T      time.Time
+	screen *image.RGBA
+	mutex  sync.RWMutex
 }
-type HostScreenManager struct {
+
+func (scr *ScreenCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
+	scr.mutex.RLock()
+	defer scr.mutex.RUnlock()
+	draw.Draw(dst, bounds, scr.screen, at, draw.Src)
+}
+
+type ScreenCaptureController struct {
 	captureFps int
 
-	screenCap ImageCapturer
-
-	viewportManger *ServerViewportManager
+	bounds      image.Rectangle
+	boundsMutex sync.RWMutex
 
 	ticker     *time.Ticker
 	tickerDone chan bool
 
-	listeners []chan *ViewportListenerResult
+	listeners      []chan *ScreenCaptureResult
+	listenersMutex sync.RWMutex
 }
 
-type HostScreenManagerConfig struct {
+type ScreenCaptureControllerConfig struct {
 	TargetCaptureFps int
-	ScreenCapper     ImageCapturer
-	ViewportManager  *ServerViewportManager
+	Bounds           image.Rectangle
 }
 
-func NewHostScreenManager(configure func(config *HostScreenManagerConfig)) *HostScreenManager {
-	cfg := HostScreenManagerConfig{
+func NewHostScreenManager(configure func(config *ScreenCaptureControllerConfig)) *ScreenCaptureController {
+	cfg := ScreenCaptureControllerConfig{
 		TargetCaptureFps: 30,
-		ScreenCapper:     nil,
-		ViewportManager:  nil,
+		Bounds:           image.Rect(0, 0, 100, 100),
 	}
 
 	configure(&cfg)
 
-	return &HostScreenManager{
-		captureFps:     cfg.TargetCaptureFps,
-		screenCap:      cfg.ScreenCapper,
-		viewportManger: cfg.ViewportManager,
+	return &ScreenCaptureController{
+		captureFps: cfg.TargetCaptureFps,
+		bounds:     cfg.Bounds,
 	}
 }
 
-func (hsm *HostScreenManager) run() {
-	hsm.screenCap.SetBounds(hsm.viewportManger.computedBounds)
-	timeout := 1000 / hsm.captureFps
-	hsm.ticker = time.NewTicker(time.Duration(timeout) * time.Millisecond)
-	hsm.tickerDone = make(chan bool)
+func (scc *ScreenCaptureController) run() {
+	timeout := 1000 / scc.captureFps
+	scc.ticker = time.NewTicker(time.Duration(timeout) * time.Millisecond)
+	scc.tickerDone = make(chan bool)
 
 	go func() {
 		for {
 			select {
-			case <-hsm.ticker.C:
+			case <-scc.ticker.C:
 				start := time.Now()
-				if err := hsm.screenCap.Capture(); err != nil {
+				scc.boundsMutex.RLock()
+				img, err := screenshot.CaptureRect(scc.bounds)
+				scc.boundsMutex.RUnlock()
+				if err != nil {
 					continue
 				}
 
-				// go update viewports -> *screencap
-				hsm.viewportManger.UpdateViewports(hsm.screenCap)
-				// notify listeners
-				for _, listener := range hsm.listeners {
-					listener <- &ViewportListenerResult{
-						Viewports: hsm.viewportManger,
-						T:         start,
-					}
+				// create result
+				result := ScreenCaptureResult{
+					screen: img,
+					T:      start,
 				}
-				return
-			case <-hsm.tickerDone:
-				close(hsm.tickerDone)
-				hsm.ticker.Stop()
+
+				// notify listeners
+				scc.listenersMutex.RLock()
+				for _, listener := range scc.listeners {
+					listener <- &result
+				}
+				scc.listenersMutex.RUnlock()
+				//return
+			case <-scc.tickerDone:
+				close(scc.tickerDone)
+				scc.ticker.Stop()
 
 				return
 			}
@@ -78,14 +92,35 @@ func (hsm *HostScreenManager) run() {
 	}()
 }
 
-func (hsm *HostScreenManager) OnCaptureUpdate(listener chan *ViewportListenerResult) {
-	hsm.listeners = append(hsm.listeners, listener)
+func (scc *ScreenCaptureController) AddListener(listener chan *ScreenCaptureResult) {
+	scc.listenersMutex.Lock()
+	defer scc.listenersMutex.Unlock()
+
+	scc.listeners = append(scc.listeners, listener)
 }
 
-func (hsm *HostScreenManager) Start() {
-	hsm.run()
+func (scc *ScreenCaptureController) RemoveListener(listener chan *ScreenCaptureResult) {
+	scc.listenersMutex.Lock()
+	defer scc.listenersMutex.Lock()
+
+	for i := range scc.listeners {
+		if scc.listeners[i] == listener {
+			scc.listeners = append(scc.listeners[:i], scc.listeners[i+1:]...)
+		}
+	}
 }
 
-func (hsm *HostScreenManager) Stop() {
-	hsm.tickerDone <- true
+func (scc *ScreenCaptureController) SetBounds(bounds image.Rectangle) {
+	scc.boundsMutex.Lock()
+	defer scc.boundsMutex.Unlock()
+
+	scc.bounds = bounds
+}
+
+func (scc *ScreenCaptureController) Start() {
+	scc.run()
+}
+
+func (scc *ScreenCaptureController) Stop() {
+	scc.tickerDone <- true
 }

@@ -3,7 +3,6 @@ package cockpit_stream
 import (
 	"errors"
 	"image"
-	"image/draw"
 	"sync"
 )
 
@@ -11,15 +10,14 @@ type ViewportReader interface {
 	GetName() string
 	GetBounds() image.Rectangle
 	GetAdjPoint() image.Point
-	Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point)
 }
 
 type Viewport struct {
 	Name string
-	// True bounds of the viewpoint
+	// True Bounds of the viewpoint
 	Bounds image.Rectangle
 
-	// Adjusted bounds within the screen manager
+	// Adjusted Bounds within the screen manager
 	// capture rectangle this is set by the screen
 	// manager
 	AdjPoint image.Point
@@ -46,12 +44,6 @@ func (vp *Viewport) Update(cap ImageSlicer) {
 	defer vp.mutex.Unlock()
 
 	cap.Slice(vp.image, vp.image.Bounds(), vp.AdjPoint)
-}
-
-func (vp *Viewport) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
-	vp.mutex.RLock()
-	defer vp.mutex.RUnlock()
-	draw.Draw(dst, bounds, vp.image, at, draw.Src)
 }
 
 type ViewportMutexMap struct {

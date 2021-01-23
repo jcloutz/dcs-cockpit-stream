@@ -2,6 +2,7 @@ package cockpit_stream
 
 import (
 	"image"
+	"image/draw"
 	"math"
 	"sync"
 	"time"
@@ -9,6 +10,24 @@ import (
 
 type ViewportContainerReader interface {
 	Get(name string) (ViewportReader, error)
+}
+
+type VPM struct {
+	src       ViewportMutexMap
+	srcBounds image.Rectangle
+
+	dest ViewportMutexMap
+
+	mutex sync.RWMutex
+}
+
+func (vpm *VPM) Slice(viewport string, dst *image.RGBA, bounds image.Rectangle, at image.Point) func(src *image.RGBA) {
+	vpm.mutex.RLock()
+	defer vpm.mutex.RUnlock()
+
+	return func(src *image.RGBA) {
+		draw.Draw(dst, bounds, src, at, draw.Src)
+	}
 }
 
 var _ ViewportContainerReader = &ServerViewportManager{}
