@@ -1,17 +1,16 @@
 package config
 
 type Config struct {
-	FramesPerSecond int             `json:"frames_per_second"`
-	Viewports       []HostViewports `json:"viewports"`
-	Clients         []Clients       `json:"clients"`
+	FramesPerSecond int                     `json:"frames_per_second"`
+	Viewports       map[string]HostViewport `json:"viewports"`
+	Clients         map[string]Client       `json:"clients"`
 }
 
-type HostViewports struct {
-	ID     string `json:"id"`
-	PosX   int    `json:"posX"`
-	PosY   int    `json:"posY"`
-	Width  int    `json:"width"`
-	Height int    `json:"height"`
+type HostViewport struct {
+	PosX   int `json:"posX"`
+	PosY   int `json:"posY"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
 }
 
 type ClientViewports struct {
@@ -20,7 +19,7 @@ type ClientViewports struct {
 	DisplayY int    `json:"displayY"`
 }
 
-type Clients struct {
+type Client struct {
 	ID        string            `json:"id"`
 	Viewports []ClientViewports `json:"viewports"`
 }

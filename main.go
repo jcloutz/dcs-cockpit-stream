@@ -19,7 +19,7 @@ func Save(img *image.RGBA, filePath string) {
 	png.Encode(file, img)
 }
 
-func open(filePath string) (*image.RGBA, error) {
+func Open(filePath string) (*image.RGBA, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err

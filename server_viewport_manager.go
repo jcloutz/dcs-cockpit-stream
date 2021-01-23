@@ -3,9 +3,7 @@ package cockpit_stream
 import (
 	"image"
 	"image/draw"
-	"math"
 	"sync"
-	"time"
 )
 
 type ViewportContainerReader interface {
@@ -30,109 +28,123 @@ func (vpm *VPM) Slice(viewport string, dst *image.RGBA, bounds image.Rectangle, 
 	}
 }
 
-var _ ViewportContainerReader = &ServerViewportManager{}
+func (vpm *VPM) AddSrc(name string, vp *Viewport) {
+	vpm.mutex.Lock()
+	defer vpm.mutex.Unlock()
 
-type ServerViewportManager struct {
-	viewports      *ViewportMutexMap
-	viewportsMutex sync.RWMutex
-
-	capture        ImageCapturer
-	targetFps      int
-	computedBounds image.Rectangle
-	done           chan bool
-	timer          *time.Ticker
-
-	fps int
+	vpm.src.Set(name, vp)
 }
 
-func NewServerViewportManager(screenCapper ImageCapturer, targetFps int) *ServerViewportManager {
-	return &ServerViewportManager{
-		viewports: NewViewportMutextMap(),
-		capture:   screenCapper,
-		targetFps: targetFps,
-	}
+func (vpm *VPM) AddDest(name string, vp *Viewport) {
+	vpm.mutex.Lock()
+	defer vpm.mutex.Unlock()
+
+	vpm.dest.Set(name, vp)
 }
 
-func (vm *ServerViewportManager) AddNewViewport(name string, x int, y int, width int, height int) *ServerViewportManager {
-	return vm.AddViewport(NewServerViewport(name, x, y, width, height))
-}
+//var _ ViewportContainerReader = &ServerViewportManager{}
 
-func (vm *ServerViewportManager) AddViewport(viewport *Viewport) *ServerViewportManager {
-	vm.viewportsMutex.Lock()
-	vm.viewports.Set(viewport.Name, viewport)
-	vm.viewportsMutex.Unlock()
+//type ServerViewportManager struct {
+//	viewports      *ViewportMutexMap
+//	viewportsMutex sync.RWMutex
+//
+//	capture        ImageCapturer
+//	targetFps      int
+//	computedBounds image.Rectangle
+//	done           chan bool
+//	timer          *time.Ticker
+//
+//	fps int
+//}
 
-	vm.recomputeBounds()
+//func NewServerViewportManager(screenCapper ImageCapturer, targetFps int) *ServerViewportManager {
+//	return &ServerViewportManager{
+//		viewports: NewViewportMutextMap(),
+//		capture:   screenCapper,
+//		targetFps: targetFps,
+//	}
+//}
 
-	return vm
-}
+//func (vm *ServerViewportManager) AddNewViewport(name string, x int, y int, width int, height int) *ServerViewportManager {
+//	return vm.AddViewport(NewServerViewport(name, x, y, width, height))
+//}
+
+//func (vm *ServerViewportManager) AddViewport(viewport *Viewport) *ServerViewportManager {
+//	vm.viewportsMutex.Lock()
+//	vm.viewports.Set(viewport.Name, viewport)
+//	vm.viewportsMutex.Unlock()
+//
+//	vm.recomputeBounds()
+//
+//	return vm
+//}
 
 // recomputeBounds will adjust
-func (vm *ServerViewportManager) recomputeBounds() {
+//func (vm *ServerViewportManager) recomputeBounds() {
+//
+//	minX := math.MaxInt16
+//	maxX := math.MinInt16
+//
+//	minY := math.MaxInt16
+//	maxY := math.MinInt16
+//
+//	vm.viewportsMutex.Lock()
+//	vm.viewports.Each(func(name string, viewport *Viewport) {
+//		if viewport.Bounds.Min.X < minX {
+//			minX = viewport.Bounds.Min.X
+//		}
+//		if viewport.Bounds.Min.Y < minY {
+//			minY = viewport.Bounds.Min.Y
+//		}
+//
+//		if viewport.Bounds.Max.X > maxX {
+//			maxX = viewport.Bounds.Max.X
+//		}
+//
+//		if viewport.Bounds.Max.Y > maxY {
+//			maxY = viewport.Bounds.Max.Y
+//		}
+//	})
+//	vm.viewportsMutex.Unlock()
+//
+//	vm.computedBounds = image.Rect(minX, minY, maxX, maxY)
+//
+//	vm.viewportsMutex.Lock()
+//	vm.viewports.Each(func(name string, viewport *Viewport) {
+//		viewport.AdjPoint = viewport.Bounds.Sub(image.Point{
+//			X: minX,
+//			Y: minY,
+//		}).Min
+//	})
+//	vm.viewportsMutex.Unlock()
+//}
 
-	minX := math.MaxInt16
-	maxX := math.MinInt16
+//func (vm *ServerViewportManager) UpdateViewports(cap ImageSlicer) {
+//	vm.viewportsMutex.Lock()
+//	defer vm.viewportsMutex.Unlock()
+//
+//	vm.viewports.Each(func(name string, viewport *Viewport) {
+//		viewport.Update(cap)
+//	})
+//}
 
-	minY := math.MaxInt16
-	maxY := math.MinInt16
+//func (vm *ServerViewportManager) benchmark() (int, int) {
+//	iterations := 120
+//	start := time.Now()
+//	for i := 0; i < iterations; i++ {
+//		_ = vm.capture.Capture()
+//	}
+//	end := time.Now()
+//
+//	avgTime := end.Sub(start).Milliseconds() / int64(iterations)
+//	maxFps := 1000 / avgTime
+//
+//	return int(avgTime), int(maxFps)
+//}
 
-	vm.viewportsMutex.Lock()
-	vm.viewports.Each(func(name string, viewport *Viewport) {
-		if viewport.Bounds.Min.X < minX {
-			minX = viewport.Bounds.Min.X
-		}
-		if viewport.Bounds.Min.Y < minY {
-			minY = viewport.Bounds.Min.Y
-		}
-
-		if viewport.Bounds.Max.X > maxX {
-			maxX = viewport.Bounds.Max.X
-		}
-
-		if viewport.Bounds.Max.Y > maxY {
-			maxY = viewport.Bounds.Max.Y
-		}
-	})
-	vm.viewportsMutex.Unlock()
-
-	vm.computedBounds = image.Rect(minX, minY, maxX, maxY)
-
-	vm.viewportsMutex.Lock()
-	vm.viewports.Each(func(name string, viewport *Viewport) {
-		viewport.AdjPoint = viewport.Bounds.Sub(image.Point{
-			X: minX,
-			Y: minY,
-		}).Min
-	})
-	vm.viewportsMutex.Unlock()
-}
-
-func (vm *ServerViewportManager) UpdateViewports(cap ImageSlicer) {
-	vm.viewportsMutex.Lock()
-	defer vm.viewportsMutex.Unlock()
-
-	vm.viewports.Each(func(name string, viewport *Viewport) {
-		viewport.Update(cap)
-	})
-}
-
-func (vm *ServerViewportManager) benchmark() (int, int) {
-	iterations := 120
-	start := time.Now()
-	for i := 0; i < iterations; i++ {
-		_ = vm.capture.Capture()
-	}
-	end := time.Now()
-
-	avgTime := end.Sub(start).Milliseconds() / int64(iterations)
-	maxFps := 1000 / avgTime
-
-	return int(avgTime), int(maxFps)
-}
-
-func (vm *ServerViewportManager) Get(name string) (ViewportReader, error) {
-	vm.viewportsMutex.RLock()
-	defer vm.viewportsMutex.RUnlock()
-
-	return vm.viewports.Get(name)
-}
+//func (vm *ServerViewportManager) Get(name string) (ViewportReader, error) {
+//	vm.viewportsMutex.RLock()
+//	defer vm.viewportsMutex.RUnlock()
+//
+//	return vm.viewports.Get(name)
+//}

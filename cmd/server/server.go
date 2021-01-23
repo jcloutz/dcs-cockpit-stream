@@ -22,15 +22,17 @@ func main() {
 	screenCapture := cockpit_stream.NewScreenCapture()
 
 	viewportManager := cockpit_stream.NewServerViewportManager(screenCapture, cfg.FramesPerSecond)
-	for _, vp := range cfg.Viewports {
+
+	for id, vp := range cfg.Viewports {
 		viewportManager.AddNewViewport(
-			vp.ID,
+			id,
 			vp.PosX,
 			vp.PosY,
 			vp.Width,
 			vp.Height,
 		)
 	}
+
 	//viewportManager.Run()
 
 	listener := make(chan *cockpit_stream.ScreenCaptureResult)
