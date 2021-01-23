@@ -16,7 +16,10 @@ func Save(img *image.RGBA, filePath string) {
 		panic(err)
 	}
 	defer file.Close()
-	png.Encode(file, img)
+	err = png.Encode(file, img)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func Open(filePath string) (*image.RGBA, error) {
@@ -160,7 +163,7 @@ func appendMethod2(compressed []uint8) {
 }
 
 //func compressionTest() {
-//	//Bounds := image.Rect(0, 0, 500, 500)
+//	//bounds := image.Rect(0, 0, 500, 500)
 //	width := 500
 //	height := 500
 //
@@ -200,12 +203,12 @@ func appendMethod2(compressed []uint8) {
 //	clientStart := time.Now()
 //	DecodeCompressedMask(payload.Bytes)
 //	////// apply mask to client image
-//	//clientIncomingMask := image.NewRGBA(Bounds)
+//	//clientIncomingMask := image.NewRGBA(bounds)
 //	//clientIncomingMask.Pix = compressionBuffer.Bytes
 //	//clientXor := NewXorBitmask(width, height)
 //	//clientXor.CalculateBitmask(client, clientIncomingMask)
 //	//
-//	//newClient := image.NewRGBA(Bounds)
+//	//newClient := image.NewRGBA(bounds)
 //	//newClient.Pix = clientXor.Buffer
 //	clientElapsed := time.Now().Sub(clientStart)
 //	elapsed := time.Now().Sub(start)
@@ -222,9 +225,9 @@ func appendMethod2(compressed []uint8) {
 //	const fps int = 30
 //	const screens int = 10
 //	const frameCount = fps * 1
-//	Bounds := image.Rect(0, 0, 1000, 500)
+//	bounds := image.Rect(0, 0, 1000, 500)
 //
-//	capturer := screen_manager.New(&Bounds, 60)
+//	capturer := screen_manager.New(&bounds, 60)
 //	for i := 0; i < screens; i++ {
 //		screen := screen_manager.NewVirtualScreen(i + 1)
 //		capturer.RegisterScreen(screen)
@@ -242,13 +245,13 @@ func appendMethod2(compressed []uint8) {
 //	//img1 := image.NewRGBA(b1)
 //	//img2 := image.NewRGBA(b2)
 //	//screenshot.CaptureDisplay(0);
-//	Bounds := b1.Union(b2)
+//	bounds := b1.Union(b2)
 //
-//	Bounds = image.Rect(0, 0, 100, 100)
+//	bounds = image.Rect(0, 0, 100, 100)
 //	const fps int = 30
 //	const screens int = 1
 //	const frameCount = fps * 1
-//	capturer := New(&Bounds, fps)
+//	capturer := New(&bounds, fps)
 //
 //	capturer.Start()
 //	var wg sync.WaitGroup

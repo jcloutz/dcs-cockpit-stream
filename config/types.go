@@ -20,6 +20,5 @@ type ClientViewports struct {
 }
 
 type Client struct {
-	ID        string            `json:"id"`
 	Viewports []ClientViewports `json:"viewports"`
 }

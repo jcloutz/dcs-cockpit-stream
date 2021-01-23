@@ -8,19 +8,20 @@ import (
 	"time"
 )
 
-type ScreenCaptureResult struct {
+type ViewportCaptureResult struct {
 	T      time.Time
 	screen *image.RGBA
 	mutex  sync.RWMutex
 }
 
-func (scr *ScreenCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
+func (scr *ViewportCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
 	scr.mutex.RLock()
 	defer scr.mutex.RUnlock()
+
 	draw.Draw(dst, bounds, scr.screen, at, draw.Src)
 }
 
-type ScreenCaptureController struct {
+type ViewportCaptureController struct {
 	captureFps int
 
 	bounds      image.Rectangle
@@ -29,30 +30,30 @@ type ScreenCaptureController struct {
 	ticker     *time.Ticker
 	tickerDone chan bool
 
-	listeners      []chan *ScreenCaptureResult
+	listeners      []chan *ViewportCaptureResult
 	listenersMutex sync.RWMutex
 }
 
-type ScreenCaptureControllerConfig struct {
+type ViewCaptureControllerConfig struct {
 	TargetCaptureFps int
 	Bounds           image.Rectangle
 }
 
-func NewHostScreenManager(configure func(config *ScreenCaptureControllerConfig)) *ScreenCaptureController {
-	cfg := ScreenCaptureControllerConfig{
+func NewViewportCaptureController(configure func(config *ViewCaptureControllerConfig)) *ViewportCaptureController {
+	cfg := ViewCaptureControllerConfig{
 		TargetCaptureFps: 30,
 		Bounds:           image.Rect(0, 0, 100, 100),
 	}
 
 	configure(&cfg)
 
-	return &ScreenCaptureController{
+	return &ViewportCaptureController{
 		captureFps: cfg.TargetCaptureFps,
 		bounds:     cfg.Bounds,
 	}
 }
 
-func (scc *ScreenCaptureController) run() {
+func (scc *ViewportCaptureController) run() {
 	timeout := 1000 / scc.captureFps
 	scc.ticker = time.NewTicker(time.Duration(timeout) * time.Millisecond)
 	scc.tickerDone = make(chan bool)
@@ -70,7 +71,7 @@ func (scc *ScreenCaptureController) run() {
 				}
 
 				// create result
-				result := ScreenCaptureResult{
+				result := ViewportCaptureResult{
 					screen: img,
 					T:      start,
 				}
@@ -81,7 +82,6 @@ func (scc *ScreenCaptureController) run() {
 					listener <- &result
 				}
 				scc.listenersMutex.RUnlock()
-				//return
 			case <-scc.tickerDone:
 				close(scc.tickerDone)
 				scc.ticker.Stop()
@@ -92,14 +92,14 @@ func (scc *ScreenCaptureController) run() {
 	}()
 }
 
-func (scc *ScreenCaptureController) AddListener(listener chan *ScreenCaptureResult) {
+func (scc *ViewportCaptureController) AddListener(listener chan *ViewportCaptureResult) {
 	scc.listenersMutex.Lock()
 	defer scc.listenersMutex.Unlock()
 
 	scc.listeners = append(scc.listeners, listener)
 }
 
-func (scc *ScreenCaptureController) RemoveListener(listener chan *ScreenCaptureResult) {
+func (scc *ViewportCaptureController) RemoveListener(listener chan *ViewportCaptureResult) {
 	scc.listenersMutex.Lock()
 	defer scc.listenersMutex.Lock()
 
@@ -110,17 +110,17 @@ func (scc *ScreenCaptureController) RemoveListener(listener chan *ScreenCaptureR
 	}
 }
 
-func (scc *ScreenCaptureController) SetBounds(bounds image.Rectangle) {
+func (scc *ViewportCaptureController) SetBounds(bounds image.Rectangle) {
 	scc.boundsMutex.Lock()
 	defer scc.boundsMutex.Unlock()
 
 	scc.bounds = bounds
 }
 
-func (scc *ScreenCaptureController) Start() {
+func (scc *ViewportCaptureController) Start() {
 	scc.run()
 }
 
-func (scc *ScreenCaptureController) Stop() {
+func (scc *ViewportCaptureController) Stop() {
 	scc.tickerDone <- true
 }

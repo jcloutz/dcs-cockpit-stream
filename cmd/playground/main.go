@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/kbinani/screenshot"
 	"image"
 	"image/color"
 	"image/draw"
@@ -34,4 +35,16 @@ func main() {
 	draw.Draw(destImage, destRect2, srcImage, destPt2, draw.Src)
 
 	cockpit_stream.Save(destImage, "output/test_out.png")
+
+	// capture test
+	desktop, _ := screenshot.Capture(0, 1440, 1680, 1050)
+
+	centerRect := image.Rect(100, 100, 500, 500)
+	centerPoint := image.Point{X: 1000, Y: 0}
+	centerImg := image.NewRGBA(centerRect)
+
+	draw.Draw(centerImg, centerRect, desktop, centerPoint, draw.Src)
+
+	cockpit_stream.Save(centerImg, "output/center.png")
+	cockpit_stream.Save(desktop, "output/desktop.png")
 }
