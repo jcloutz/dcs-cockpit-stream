@@ -62,6 +62,8 @@ func (scc *ViewportCaptureController) run() {
 		for {
 			select {
 			case <-scc.ticker.C:
+				//ctx := context.Background()
+				//ctx :=
 				start := time.Now()
 				scc.boundsMutex.RLock()
 				img, err := screenshot.CaptureRect(scc.bounds)

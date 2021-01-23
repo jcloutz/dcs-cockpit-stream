@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/BurntSushi/xgb v0.0.0-20201008132610-5f9e7b3c49cd // indirect
+	github.com/armon/go-metrics v0.3.6
 	github.com/frankban/quicktest v1.11.3 // indirect
 	github.com/gen2brain/shm v0.0.0-20200228170931-49f9650110c5 // indirect
 	github.com/gotk3/gotk3 v0.5.2
