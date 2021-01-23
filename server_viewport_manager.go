@@ -1,23 +1,20 @@
 package cockpit_stream
 
 import (
-	"errors"
-	"fmt"
 	"image"
 	"math"
 	"sync"
 	"time"
 )
 
-type ImageSlicerContainer interface {
-	HasSlicer(name string) bool
-	Slice(name string, dst *image.RGBA, bounds image.Rectangle, at image.Point) error
+type ViewportContainerReader interface {
+	Get(name string) (ViewportReader, error)
 }
 
-var _ ImageSlicerContainer = &ServerViewportManager{}
+var _ ViewportContainerReader = &ServerViewportManager{}
 
 type ServerViewportManager struct {
-	viewports      map[string]*ServerViewport
+	viewports      *ViewportMutexMap
 	viewportsMutex sync.RWMutex
 
 	capture        ImageCapturer
@@ -31,7 +28,7 @@ type ServerViewportManager struct {
 
 func NewServerViewportManager(screenCapper ImageCapturer, targetFps int) *ServerViewportManager {
 	return &ServerViewportManager{
-		viewports: make(map[string]*ServerViewport),
+		viewports: NewViewportMutextMap(),
 		capture:   screenCapper,
 		targetFps: targetFps,
 	}
@@ -41,10 +38,10 @@ func (vm *ServerViewportManager) AddNewViewport(name string, x int, y int, width
 	return vm.AddViewport(NewServerViewport(name, x, y, width, height))
 }
 
-func (vm *ServerViewportManager) AddViewport(viewport *ServerViewport) *ServerViewportManager {
+func (vm *ServerViewportManager) AddViewport(viewport *Viewport) *ServerViewportManager {
 	vm.viewportsMutex.Lock()
-	defer vm.viewportsMutex.Unlock()
-	vm.viewports[viewport.Name] = viewport
+	vm.viewports.Set(viewport.Name, viewport)
+	vm.viewportsMutex.Unlock()
 
 	vm.recomputeBounds()
 
@@ -53,12 +50,15 @@ func (vm *ServerViewportManager) AddViewport(viewport *ServerViewport) *ServerVi
 
 // recomputeBounds will adjust
 func (vm *ServerViewportManager) recomputeBounds() {
+
 	minX := math.MaxInt16
 	maxX := math.MinInt16
 
 	minY := math.MaxInt16
 	maxY := math.MinInt16
-	for _, viewport := range vm.viewports {
+
+	vm.viewportsMutex.Lock()
+	vm.viewports.Each(func(name string, viewport *Viewport) {
 		if viewport.Bounds.Min.X < minX {
 			minX = viewport.Bounds.Min.X
 		}
@@ -73,24 +73,28 @@ func (vm *ServerViewportManager) recomputeBounds() {
 		if viewport.Bounds.Max.Y > maxY {
 			maxY = viewport.Bounds.Max.Y
 		}
-	}
+	})
+	vm.viewportsMutex.Unlock()
+
 	vm.computedBounds = image.Rect(minX, minY, maxX, maxY)
 
-	for _, viewport := range vm.viewports {
+	vm.viewportsMutex.Lock()
+	vm.viewports.Each(func(name string, viewport *Viewport) {
 		viewport.AdjPoint = viewport.Bounds.Sub(image.Point{
 			X: minX,
 			Y: minY,
 		}).Min
-	}
+	})
+	vm.viewportsMutex.Unlock()
 }
 
 func (vm *ServerViewportManager) UpdateViewports(cap ImageSlicer) {
-	vm.viewportsMutex.RLock()
-	defer vm.viewportsMutex.RUnlock()
+	vm.viewportsMutex.Lock()
+	defer vm.viewportsMutex.Unlock()
 
-	for _, vp := range vm.viewports {
-		vp.Update(cap)
-	}
+	vm.viewports.Each(func(name string, viewport *Viewport) {
+		viewport.Update(cap)
+	})
 }
 
 func (vm *ServerViewportManager) benchmark() (int, int) {
@@ -107,21 +111,9 @@ func (vm *ServerViewportManager) benchmark() (int, int) {
 	return int(avgTime), int(maxFps)
 }
 
-func (vm *ServerViewportManager) HasSlicer(name string) bool {
-	vm.viewportsMutex.RLock()
-	defer vm.viewportsMutex.RUnlock()
-	_, ok := vm.viewports[name]
-	return ok
-}
-
-func (vm *ServerViewportManager) Slice(name string, dst *image.RGBA, bounds image.Rectangle, at image.Point) error {
-	if !vm.HasSlicer(name) {
-		return errors.New(fmt.Sprintf("no viewport with name '%s' found", name))
-	}
+func (vm *ServerViewportManager) Get(name string) (ViewportReader, error) {
 	vm.viewportsMutex.RLock()
 	defer vm.viewportsMutex.RUnlock()
 
-	vm.viewports[name].Slice(dst, bounds, at)
-
-	return nil
+	return vm.viewports.Get(name)
 }

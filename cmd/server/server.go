@@ -10,9 +10,11 @@ import (
 
 	"github.com/jcloutz/cockpit_stream"
 	"github.com/jcloutz/cockpit_stream/config"
+	"github.com/pkg/profile"
 )
 
 func main() {
+	defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
 	cfg, err := config.New("config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -32,7 +34,7 @@ func main() {
 	}
 	//viewportManager.Run()
 
-	listener := make(chan *cockpit_stream.ListenerResult)
+	listener := make(chan *cockpit_stream.ViewportListenerResult)
 	sm := cockpit_stream.NewHostScreenManager(func(smConfig *cockpit_stream.HostScreenManagerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
 		smConfig.ScreenCapper = screenCapture
@@ -41,6 +43,8 @@ func main() {
 
 	sm.OnCaptureUpdate(listener)
 	sm.Start()
+	done := make(chan bool, 1)
+	quit := make(chan os.Signal, 1)
 
 	go func() {
 		start := time.Now()
@@ -54,16 +58,30 @@ func main() {
 			select {
 			case res := <-listener:
 				count++
-				//go func() {
-				res.Slicer.Slice("left", leftImg, sizeRec, image.Point{X: 0, Y: 0})
-				//}()
-				//go func() {
-				res.Slicer.Slice("right", centerImg, sizeRec, image.Point{X: 0, Y: 0})
-				//}()
-				//go func() {
-				res.Slicer.Slice("center", rightImg, sizeRec, image.Point{X: 0, Y: 0})
-				//}()
+				go func() {
+					left, err := res.Viewports.Get("left")
+					if err != nil {
+						log.Println(err)
+					}
+					left.Slice(leftImg, sizeRec, image.Point{X: 0, Y: 0})
+				}()
+				go func() {
+					right, err := res.Viewports.Get("right")
+					if err != nil {
+						log.Println(err)
+					}
+					right.Slice(centerImg, sizeRec, image.Point{X: 0, Y: 0})
+				}()
+				go func() {
+					center, err := res.Viewports.Get("center")
+					if err != nil {
+						log.Println(err)
+					}
+					center.Slice(rightImg, sizeRec, image.Point{X: 0, Y: 0})
+				}()
 
+				close(quit)
+				done <- true
 				if count%100 == 0 {
 					elapsed := time.Now().Sub(res.T)
 					elapsedTotal := time.Now().Sub(start)
@@ -76,9 +94,6 @@ func main() {
 			}
 		}
 	}()
-
-	done := make(chan bool, 1)
-	quit := make(chan os.Signal, 1)
 
 	signal.Notify(quit, os.Interrupt)
 

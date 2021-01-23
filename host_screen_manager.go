@@ -4,9 +4,9 @@ import (
 	"time"
 )
 
-type ListenerResult struct {
-	Slicer ImageSlicerContainer
-	T      time.Time
+type ViewportListenerResult struct {
+	Viewports ViewportContainerReader
+	T         time.Time
 }
 type HostScreenManager struct {
 	captureFps int
@@ -18,7 +18,7 @@ type HostScreenManager struct {
 	ticker     *time.Ticker
 	tickerDone chan bool
 
-	listeners []chan *ListenerResult
+	listeners []chan *ViewportListenerResult
 }
 
 type HostScreenManagerConfig struct {
@@ -62,12 +62,12 @@ func (hsm *HostScreenManager) run() {
 				hsm.viewportManger.UpdateViewports(hsm.screenCap)
 				// notify listeners
 				for _, listener := range hsm.listeners {
-					listener <- &ListenerResult{
-						Slicer: hsm.viewportManger,
-						T:      start,
+					listener <- &ViewportListenerResult{
+						Viewports: hsm.viewportManger,
+						T:         start,
 					}
 				}
-
+				return
 			case <-hsm.tickerDone:
 				close(hsm.tickerDone)
 				hsm.ticker.Stop()
@@ -78,7 +78,7 @@ func (hsm *HostScreenManager) run() {
 	}()
 }
 
-func (hsm *HostScreenManager) OnCaptureUpdate(listener chan *ListenerResult) {
+func (hsm *HostScreenManager) OnCaptureUpdate(listener chan *ViewportListenerResult) {
 	hsm.listeners = append(hsm.listeners, listener)
 }
 
