@@ -3,6 +3,7 @@ package cockpit_stream
 import (
 	"image"
 	"sync"
+	"time"
 )
 
 type HandlerViewport struct {
@@ -24,19 +25,24 @@ type ViewportCaptureHandler struct {
 
 	handlerViewports map[string]*HandlerViewport
 
+	MetricsService *MetricsService
+
 	prevImage *image.RGBA
 	curImage  *image.RGBA
 }
 
-func NewViewportCaptureHandler(id string, container *ViewportContainer) *ViewportCaptureHandler {
+func NewViewportCaptureHandler(id string, container *ViewportContainer, metrics *MetricsService) *ViewportCaptureHandler {
 	return &ViewportCaptureHandler{
 		id:               id,
 		serverViewports:  container,
 		handlerViewports: make(map[string]*HandlerViewport),
+		MetricsService:   metrics,
 	}
 }
 
 func (ch *ViewportCaptureHandler) Handle(result *ViewportCaptureResult) {
+	defer ch.MetricsService.MeasureTimeForClient(time.Now(), HandleCapture, ch.id)
+
 	var wg sync.WaitGroup
 	wg.Add(len(ch.handlerViewports))
 	for _, hVp := range ch.handlerViewports {

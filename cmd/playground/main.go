@@ -2,20 +2,31 @@ package main
 
 import (
 	"fmt"
+	"math"
+
 	"github.com/kbinani/screenshot"
+
 	"image"
 	"image/color"
 	"image/draw"
 	"log"
+	"math/rand"
+	"sync"
 	"time"
 
-	"github.com/armon/go-metrics"
+	metrics2 "github.com/armon/go-metrics"
 	"github.com/jcloutz/cockpit_stream"
 )
 
+type foo struct {
+	value *int
+}
+
 func main() {
+	rand.Seed(time.Now().UnixNano())
+	memSink := metrics2.NewInmemSink(5*time.Second, 10*time.Second)
+
 	start := time.Now()
-	inm := metrics.NewInmemSink(1*time.Second, 10*time.Second)
 	//_, err := metrics.NewGlobal(metrics.DefaultConfig("service-name"), inm)
 	//if err != nil {
 	//	log.Fatal(err)
@@ -58,27 +69,44 @@ func main() {
 	cockpit_stream.Save(centerImg, "output/center.png")
 	cockpit_stream.Save(desktop, "output/desktop.png")
 
-	for i := 0; i < 20; i++ {
-		time.Sleep(1 * time.Millisecond)
-		inm.AddSample([]string{"exec"}, float32(time.Since(start)))
+	//print := func() {
+	//	fmt.Println("--------------")
+	//	fmt.Println("sample count", timer.Count())
+	//	fmt.Println("mean", int64(timer.Mean()/float64(time.Millisecond)))
+	//	fmt.Println("max", timer.Max()/int64(time.Millisecond))
+	//	fmt.Println("min", timer.Min()/int64(time.Millisecond))
+	//}
+
+	for i := 0; i < 500; i++ {
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			funcStart := time.Now()
+			timeout := rand.Intn(29) + 1
+			time.Sleep(time.Duration(timeout) * time.Millisecond)
+			memSink.AddSample([]string{fmt.Sprintf("exec")}, float32(time.Since(funcStart).Milliseconds()))
+			wg.Done()
+		}()
+
+		wg.Wait()
 	}
+
 	elapsed := time.Since(start)
-
-	dt := inm.Data()
+	fmt.Println("elapsed", elapsed.Milliseconds())
+	dt := memSink.Data()
 	fmt.Println("len", len(dt))
-	for _, v := range dt {
+	for _, el := range dt {
+		for name, sample := range el.Samples {
+			fmt.Println(fmt.Sprintf("---- %s ----", name))
+			fmt.Println("elapsed", elapsed.Milliseconds())
 
-		sample := v.Samples["exec"]
-
-		fmt.Println("--------------")
-		fmt.Println("elapsed", elapsed.Milliseconds())
-		fmt.Println("sample count", sample.Count)
-		fmt.Println("mean", time.Duration(sample.Sum/float64(sample.Count))/time.Nanosecond)
-		fmt.Println("max", time.Duration(sample.Max)/time.Nanosecond)
-		fmt.Println("min", time.Duration(sample.Min)/time.Nanosecond)
-		fmt.Println("string", sample.String())
+			fmt.Println("sample count", sample.Count)
+			fmt.Println("mean", math.Round(sample.Sum/float64(sample.Count)))
+			fmt.Println("max", sample.Max /*float64(time.Millisecond)*/)
+			fmt.Println("min", sample.Min /*float64(time.Millisecond)*/)
+		}
+		fmt.Println("------------------------------------------------")
+		fmt.Println("----------------- NEW DATASET ------------------")
+		fmt.Println("------------------------------------------------")
 	}
-
-	fmt.Println("Waiting")
-	time.Sleep(15 * time.Second)
 }

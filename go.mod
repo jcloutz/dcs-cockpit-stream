@@ -13,6 +13,7 @@ require (
 	github.com/lxn/win v0.0.0-20201111105847-2a20daff6a55 // indirect
 	github.com/pierrec/lz4 v2.6.0+incompatible
 	github.com/pkg/profile v1.5.0
+	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	go.nanomsg.org/mangos/v3 v3.1.3
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )

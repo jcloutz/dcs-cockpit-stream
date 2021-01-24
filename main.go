@@ -51,7 +51,6 @@ func toByteArray(i int32) (arr [4]byte) {
 }
 
 func generateRandomSlice(size int) []uint8 {
-
 	slice := make([]uint8, size, size)
 	rand.Seed(time.Now().UnixNano())
 	for i := 0; i < size; i++ {

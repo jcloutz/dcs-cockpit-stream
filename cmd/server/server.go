@@ -9,11 +9,11 @@ import (
 
 	"github.com/jcloutz/cockpit_stream"
 	"github.com/jcloutz/cockpit_stream/config"
-	"github.com/pkg/profile"
 )
 
 func main() {
-	defer profile.Start(profile.TraceProfile, profile.ProfilePath(".")).Stop()
+
+	metricService := cockpit_stream.NewMetrics()
 	cfg, err := config.New("config.json")
 	if err != nil {
 		log.Fatal(err)
@@ -26,7 +26,7 @@ func main() {
 
 	var handlers []*cockpit_stream.ViewportCaptureHandler
 	for id, client := range cfg.Clients {
-		handler := cockpit_stream.NewViewportCaptureHandler(id, viewports)
+		handler := cockpit_stream.NewViewportCaptureHandler(id, viewports, metricService)
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
@@ -38,6 +38,7 @@ func main() {
 	listener := make(chan *cockpit_stream.ViewportCaptureResult)
 	sm := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.ViewCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
+		smConfig.Metrics = metricService
 	})
 
 	sm.AddListener(listener)
@@ -47,6 +48,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 
 	go func() {
+
 		start := time.Now()
 		count := 0
 		//size := 500

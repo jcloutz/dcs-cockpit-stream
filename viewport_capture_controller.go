@@ -1,17 +1,30 @@
 package cockpit_stream
 
 import (
-	"github.com/kbinani/screenshot"
+	"context"
 	"image"
 	"image/draw"
 	"sync"
 	"time"
+
+	"github.com/kbinani/screenshot"
 )
+
+const (
+	CaptureContextKey = iota
+)
+
+type CaptureContext struct {
+	StartTime time.Time
+	Metric    *MetricsService
+	ClientId  string
+}
 
 type ViewportCaptureResult struct {
 	T      time.Time
 	screen *image.RGBA
 	mutex  sync.RWMutex
+	ctx    context.Context
 }
 
 func (scr *ViewportCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
@@ -32,11 +45,13 @@ type ViewportCaptureController struct {
 
 	listeners      []chan *ViewportCaptureResult
 	listenersMutex sync.RWMutex
+	metricsService *MetricsService
 }
 
 type ViewCaptureControllerConfig struct {
 	TargetCaptureFps int
 	Bounds           image.Rectangle
+	Metrics          *MetricsService
 }
 
 func NewViewportCaptureController(configure func(config *ViewCaptureControllerConfig)) *ViewportCaptureController {
@@ -62,9 +77,15 @@ func (scc *ViewportCaptureController) run() {
 		for {
 			select {
 			case <-scc.ticker.C:
-				//ctx := context.Background()
-				//ctx :=
 				start := time.Now()
+
+				ctx := context.Background()
+				ctx = context.WithValue(ctx, CaptureContextKey, CaptureContext{
+					StartTime: time.Now(),
+					Metric:    scc.metricsService,
+					ClientId:  "",
+				})
+
 				scc.boundsMutex.RLock()
 				img, err := screenshot.CaptureRect(scc.bounds)
 				scc.boundsMutex.RUnlock()
@@ -76,6 +97,7 @@ func (scc *ViewportCaptureController) run() {
 				result := ViewportCaptureResult{
 					screen: img,
 					T:      start,
+					ctx:    ctx,
 				}
 
 				// notify listeners
@@ -84,6 +106,7 @@ func (scc *ViewportCaptureController) run() {
 					listener <- &result
 				}
 				scc.listenersMutex.RUnlock()
+				scc.metricsService.MeasureTime(start, ScreenCapure)
 			case <-scc.tickerDone:
 				close(scc.tickerDone)
 				scc.ticker.Stop()
