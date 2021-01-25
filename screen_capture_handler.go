@@ -21,6 +21,8 @@ type ScreenCaptureHandler struct {
 	outputPath       string
 	prevImage        *image.RGBA
 	curImage         *image.RGBA
+
+	container *ViewportContainer
 }
 
 func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *metrics.Service) *ScreenCaptureHandler {
@@ -29,6 +31,7 @@ func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *
 		serverViewports:  container,
 		handlerViewports: make(map[string]*Viewport),
 		MetricsService:   metrics,
+		container:        NewViewportContainer(),
 	}
 }
 
@@ -49,7 +52,7 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	wg.Wait()
 
 	if sch.outputImage {
-		Save(sch.curImage, path.Join(sch.outputPath, fmt.Sprintf("%s.png", sch.id)))
+		SavePng(sch.curImage, path.Join(sch.outputPath, fmt.Sprintf("%s.png", sch.id)))
 	}
 
 	// imgPrev

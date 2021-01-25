@@ -2,48 +2,9 @@ package cockpit_stream
 
 import (
 	"encoding/binary"
-	"image"
-	"image/draw"
-	"image/png"
 	"math/rand"
-	"os"
 	"time"
 )
-
-func Save(img *image.RGBA, filePath string) {
-	file, err := os.Create(filePath)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-	err = png.Encode(file, img)
-	if err != nil {
-		panic(err)
-	}
-}
-
-func Open(filePath string) (*image.RGBA, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	srcImg, _, err := image.Decode(file)
-	if err != nil {
-		return nil, err
-	}
-
-	bounds := image.Rect(0, 0, 500, 500)
-	img := image.NewRGBA(bounds)
-
-	draw.Draw(img, bounds, srcImg, image.Point{
-		X: 0,
-		Y: 0,
-	}, draw.Src)
-
-	return img, nil
-}
 
 func toByteArray(i int32) (arr [4]byte) {
 	binary.BigEndian.PutUint32(arr[0:4], uint32(i))
@@ -231,7 +192,7 @@ func appendMethod2(compressed []uint8) {
 //		screen := screen_manager.NewVirtualScreen(i + 1)
 //		capturer.RegisterScreen(screen)
 //	}
-//	capturer.Start()
+//	capturer.Run()
 //
 //	time.Sleep(1 * time.Second)
 //	capturer.Stop()
@@ -252,7 +213,7 @@ func appendMethod2(compressed []uint8) {
 //	const frameCount = fps * 1
 //	capturer := New(&Bounds, fps)
 //
-//	capturer.Start()
+//	capturer.Run()
 //	var wg sync.WaitGroup
 //	//time.Sleep(2 * time.Second)
 //	for scr := 1; scr <= screens; scr++ {

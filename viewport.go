@@ -2,6 +2,7 @@ package cockpit_stream
 
 import (
 	"image"
+	"image/draw"
 	"sync"
 )
 
@@ -39,6 +40,20 @@ func NewViewport(name string, x int, y int, width int, height int) *Viewport {
 		Bounds:   image.Rect(0, 0, width, height),
 		Position: image.Point{X: x, Y: y},
 	}
+}
+
+func NewViewportWithSlice(name string, x int, y int, width int, height int, sliceAt image.Point) *Viewport {
+	vp := NewViewport(name, x, y, width, height)
+	vp.SlicePosition = sliceAt
+
+	return vp
+}
+
+func (vp *Viewport) Slice(dst *image.RGBA, src *image.RGBA) {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	draw.Draw(dst, vp.Bounds, src, vp.SlicePosition, draw.Src)
 }
 
 // Lock the Viewport for mutation

@@ -17,6 +17,8 @@ type ViewportContainer struct {
 	// rectangle containing all serverViewports registered with this
 	// instance
 	bounds image.Rectangle
+
+	boundsOffset image.Point
 }
 
 func NewViewportContainer() *ViewportContainer {
@@ -34,6 +36,14 @@ func (vm *ViewportContainer) Has(key string) bool {
 	return ok
 }
 
+func (vm *ViewportContainer) Add(viewport *Viewport) {
+	vm.mutex.Lock()
+	vm.data[viewport.Name] = viewport
+	vm.mutex.Unlock()
+
+	vm.recomputeBounds()
+}
+
 func (vm *ViewportContainer) Get(key string) (*Viewport, error) {
 	vm.mutex.RLock()
 	defer vm.mutex.RUnlock()
@@ -44,14 +54,6 @@ func (vm *ViewportContainer) Get(key string) (*Viewport, error) {
 	}
 
 	return viewport, nil
-}
-
-func (vm *ViewportContainer) Add(key string, viewport *Viewport) {
-	vm.mutex.Lock()
-	vm.data[key] = viewport
-	vm.mutex.Unlock()
-
-	vm.recomputeBounds()
 }
 
 func (vm *ViewportContainer) Each(callback func(name string, viewport *Viewport)) {
@@ -69,8 +71,18 @@ func (vm *ViewportContainer) Count() int {
 	return len(vm.data)
 }
 
-func (vm *ViewportContainer) GetBounds() image.Rectangle {
+func (vm *ViewportContainer) Bounds() image.Rectangle {
 	return vm.bounds
+}
+
+func (vm *ViewportContainer) BoundsOffset() image.Point {
+	return vm.boundsOffset
+}
+
+func (vm *ViewportContainer) ViewportOffset(viewport *Viewport) (image.Point, error) {
+	viewport.RLock()
+	defer viewport.RUnlock()
+	return viewport.Position.Sub(vm.boundsOffset), nil
 }
 
 // recomputeBounds will adjust
@@ -107,6 +119,7 @@ func (vm *ViewportContainer) recomputeBounds() {
 	})
 
 	vm.bounds = image.Rect(minX, minY, maxX, maxY)
+	vm.boundsOffset = image.Point{X: minX, Y: minY}
 
 	vm.Each(func(name string, viewport *Viewport) {
 		viewport.Lock()
@@ -114,6 +127,7 @@ func (vm *ViewportContainer) recomputeBounds() {
 
 		offset := viewport.Position
 
+		// cache the offset in the viewport
 		viewport.SlicePosition = offset.Sub(image.Point{
 			X: minX,
 			Y: minY,

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jcloutz/cockpit_stream"
@@ -22,14 +23,14 @@ func main() {
 	// create viewports
 	viewports := cockpit_stream.NewViewportContainer()
 	for id, vp := range cfg.Viewports {
-		viewports.Add(id, cockpit_stream.NewViewport(id, vp.PosX, vp.PosY, vp.Width, vp.Height))
+		viewports.Add(cockpit_stream.NewViewport(id, vp.PosX, vp.PosY, vp.Width, vp.Height))
 	}
 
 	// Create handlers
 	var handlers []*cockpit_stream.ScreenCaptureHandler
 	for id, client := range cfg.Clients {
 		handler := cockpit_stream.NewViewportStreamHandler(id, viewports, metricService)
-		handler.EnableOutput("output")
+		//handler.EnableOutput("output")
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
@@ -39,11 +40,11 @@ func main() {
 	}
 
 	// create capture controller
-	viewportCaptureController := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.DesktopCaptureControllerConfig) {
+	viewportCaptureController := cockpit_stream.NewDesktopCaptureController(func(smConfig *cockpit_stream.DesktopCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
 		smConfig.Metrics = metricService
 	})
-	viewportCaptureController.SetBounds(viewports.GetBounds())
+	viewportCaptureController.SetBounds(viewports.Bounds())
 
 	for _, handler := range handlers {
 		viewportCaptureController.AddListener(handler)
@@ -85,6 +86,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	quit <- syscall.SIGINT
+	//viewportCaptureController.Run()
 
 	signal.Notify(quit, os.Interrupt)
 

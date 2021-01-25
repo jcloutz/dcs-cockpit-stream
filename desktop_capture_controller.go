@@ -30,7 +30,7 @@ type DesktopCaptureControllerConfig struct {
 	Metrics          *metrics.Service
 }
 
-func NewViewportCaptureController(configure func(config *DesktopCaptureControllerConfig)) *DesktopCaptureController {
+func NewDesktopCaptureController(configure func(config *DesktopCaptureControllerConfig)) *DesktopCaptureController {
 	cfg := DesktopCaptureControllerConfig{
 		TargetCaptureFps: 30,
 		Bounds:           image.Rect(0, 0, 100, 100),
@@ -122,7 +122,7 @@ func (scc *DesktopCaptureController) SetBounds(bounds image.Rectangle) {
 	scc.bounds = bounds
 }
 
-func (scc *DesktopCaptureController) Start() {
+func (scc *DesktopCaptureController) Run() {
 	scc.run()
 }
 
