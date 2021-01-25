@@ -31,7 +31,7 @@ func (scc *CaptureResultNotifier) RemoveListener(listener CaptureResultHandler) 
 	}
 }
 
-func (scc *CaptureResultNotifier) Notify(result *ScreenCaptureResult) {
+func (scc *CaptureResultNotifier) Notify(result *CaptureResult) {
 	scc.listenersMutex.RLock()
 	defer scc.listenersMutex.RUnlock()
 

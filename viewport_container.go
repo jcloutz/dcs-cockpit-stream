@@ -34,7 +34,7 @@ func (vm *ViewportContainer) Has(key string) bool {
 	return ok
 }
 
-func (vm *ViewportContainer) Get(key string) (ViewportReader, error) {
+func (vm *ViewportContainer) Get(key string) (*Viewport, error) {
 	vm.mutex.RLock()
 	defer vm.mutex.RUnlock()
 
@@ -52,43 +52,6 @@ func (vm *ViewportContainer) Add(key string, viewport *Viewport) {
 	vm.mutex.Unlock()
 
 	vm.recomputeBounds()
-}
-
-func (vm *ViewportContainer) OneMutate(name string, callback func(viewport *Viewport)) error {
-	vm.mutex.Lock()
-	defer vm.mutex.Unlock()
-
-	viewport, ok := vm.data[name]
-	if !ok {
-		return errors.New("viewport does not exist")
-	}
-
-	callback(viewport)
-
-	return nil
-}
-
-func (vm *ViewportContainer) One(name string, callback func(viewport ViewportReader)) error {
-	vm.mutex.RLock()
-	defer vm.mutex.RUnlock()
-
-	viewport, ok := vm.data[name]
-	if !ok {
-		return errors.New("viewport does not exist")
-	}
-
-	callback(viewport)
-
-	return nil
-}
-
-func (vm *ViewportContainer) EachMutate(callback func(name string, viewport *Viewport)) {
-	vm.mutex.Lock()
-	defer vm.mutex.Unlock()
-
-	for name, viewport := range vm.data {
-		callback(name, viewport)
-	}
 }
 
 func (vm *ViewportContainer) Each(callback func(name string, viewport *Viewport)) {
@@ -119,8 +82,11 @@ func (vm *ViewportContainer) recomputeBounds() {
 	maxY := math.MinInt16
 
 	vm.Each(func(name string, viewport *Viewport) {
-		bounds := viewport.GetBounds()
-		offset := viewport.GetRealOffset()
+		viewport.RLock()
+		defer viewport.RUnlock()
+
+		bounds := viewport.Bounds
+		offset := viewport.Position
 
 		if offset.X < minX {
 			minX = offset.X
@@ -142,10 +108,13 @@ func (vm *ViewportContainer) recomputeBounds() {
 
 	vm.bounds = image.Rect(minX, minY, maxX, maxY)
 
-	vm.EachMutate(func(name string, viewport *Viewport) {
-		offset := viewport.GetRealOffset()
+	vm.Each(func(name string, viewport *Viewport) {
+		viewport.Lock()
+		defer viewport.Unlock()
 
-		viewport.slicePosition = offset.Sub(image.Point{
+		offset := viewport.Position
+
+		viewport.SlicePosition = offset.Sub(image.Point{
 			X: minX,
 			Y: minY,
 		})

@@ -2,17 +2,17 @@ package main
 
 import (
 	"fmt"
-	"github.com/jcloutz/cockpit_stream"
-	"github.com/jcloutz/cockpit_stream/config"
-	"github.com/jcloutz/cockpit_stream/metrics"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/jcloutz/cockpit_stream"
+	"github.com/jcloutz/cockpit_stream/config"
+	"github.com/jcloutz/cockpit_stream/metrics"
 )
 
 func main() {
-
 	metricService := metrics.New()
 	cfg, err := config.New("config.json")
 	if err != nil {
@@ -26,9 +26,10 @@ func main() {
 	}
 
 	// Create handlers
-	var handlers []*ViewportStream
+	var handlers []*cockpit_stream.ScreenCaptureHandler
 	for id, client := range cfg.Clients {
-		handler := NewViewportStreamHandler(id, viewports, metricService)
+		handler := cockpit_stream.NewViewportStreamHandler(id, viewports, metricService)
+		handler.EnableOutput("output")
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
@@ -38,7 +39,7 @@ func main() {
 	}
 
 	// create capture controller
-	viewportCaptureController := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.ViewCaptureControllerConfig) {
+	viewportCaptureController := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.DesktopCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
 		smConfig.Metrics = metricService
 	})
@@ -51,15 +52,15 @@ func main() {
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
 
-	loggingListener := &cockpit_stream.ScreenCaptureCustomHandler{}
+	loggingListener := &cockpit_stream.CallbackCaptureHandler{}
 
 	count := 0
-	loggingListener.OnReceive(func(res *cockpit_stream.ScreenCaptureResult) {
+	loggingListener.OnReceive(func(res *cockpit_stream.CaptureResult) {
 		count++
 
 		if count%100 == 0 {
 			fmt.Println("-----------------")
-			if capCtx, err := cockpit_stream.GetCaptureContext(res.Ctx); err == nil {
+			if capCtx, err := res.GetCaptureContext(); err == nil {
 				data := capCtx.Metric.Data()
 				fmt.Printf("captures frames: %.2f\n", data.GetCount(metrics.MetricFrameCounter).Sum)
 				fmt.Printf("total screen cap time: %.2fs\n", data.GetSample(metrics.MetricSampleCaptureController).Sum/float64(time.Second))
@@ -80,7 +81,10 @@ func main() {
 	})
 	viewportCaptureController.AddListener(loggingListener)
 
-	viewportCaptureController.Start()
+	err = viewportCaptureController.RunOnce()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	signal.Notify(quit, os.Interrupt)
 
