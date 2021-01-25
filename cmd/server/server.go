@@ -2,31 +2,33 @@ package main
 
 import (
 	"fmt"
+	"github.com/jcloutz/cockpit_stream"
+	"github.com/jcloutz/cockpit_stream/config"
+	"github.com/jcloutz/cockpit_stream/metrics"
 	"log"
 	"os"
 	"os/signal"
 	"time"
-
-	"github.com/jcloutz/cockpit_stream"
-	"github.com/jcloutz/cockpit_stream/config"
 )
 
 func main() {
 
-	metricService := cockpit_stream.NewMetrics()
+	metricService := metrics.New()
 	cfg, err := config.New("config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// create viewports
 	viewports := cockpit_stream.NewViewportContainer()
 	for id, vp := range cfg.Viewports {
 		viewports.Add(id, cockpit_stream.NewViewport(id, vp.PosX, vp.PosY, vp.Width, vp.Height))
 	}
 
-	var handlers []*cockpit_stream.ViewportCaptureHandler
+	// Create handlers
+	var handlers []*ViewportStream
 	for id, client := range cfg.Clients {
-		handler := cockpit_stream.NewViewportCaptureHandler(id, viewports, metricService)
+		handler := NewViewportStreamHandler(id, viewports, metricService)
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
@@ -35,69 +37,50 @@ func main() {
 		handlers = append(handlers, handler)
 	}
 
-	listener := make(chan *cockpit_stream.ViewportCaptureResult)
-	sm := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.ViewCaptureControllerConfig) {
+	// create capture controller
+	viewportCaptureController := cockpit_stream.NewViewportCaptureController(func(smConfig *cockpit_stream.ViewCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
 		smConfig.Metrics = metricService
 	})
+	viewportCaptureController.SetBounds(viewports.GetBounds())
 
-	sm.AddListener(listener)
-	sm.SetBounds(viewports.GetBounds())
-	sm.Start()
+	for _, handler := range handlers {
+		viewportCaptureController.AddListener(handler)
+	}
+
 	done := make(chan bool, 1)
 	quit := make(chan os.Signal, 1)
 
-	go func() {
+	loggingListener := &cockpit_stream.ScreenCaptureCustomHandler{}
 
-		start := time.Now()
-		count := 0
-		//size := 500
-		//sizeRec := image.Rect(0, 0, size, size)
-		//leftImg := image.NewRGBA(sizeRec)
-		//centerImg := image.NewRGBA(sizeRec)
-		//rightImg := image.NewRGBA(sizeRec)
-		for {
-			select {
-			case res := <-listener:
-				count++
+	count := 0
+	loggingListener.OnReceive(func(res *cockpit_stream.ScreenCaptureResult) {
+		count++
 
-				for _, handler := range handlers {
-					go handler.Handle(res)
-				}
-				//go func() {
-				//	left, err := res.Viewports.Get("left")
-				//	if err != nil {
-				//		log.Println(err)
-				//	}
-				//	left.Slice(leftImg, sizeRec, image.point{X: 0, Y: 0})
-				//}()
-				//go func() {
-				//	right, err := res.Viewports.Get("right")
-				//	if err != nil {
-				//		log.Println(err)
-				//	}
-				//	right.Slice(centerImg, sizeRec, image.point{X: 0, Y: 0})
-				//}()
-				//go func() {
-				//	center, err := res.Viewports.Get("center")
-				//	if err != nil {
-				//		log.Println(err)
-				//	}
-				//	center.Slice(rightImg, sizeRec, image.point{X: 0, Y: 0})
-				//}()
+		if count%100 == 0 {
+			fmt.Println("-----------------")
+			if capCtx, err := cockpit_stream.GetCaptureContext(res.Ctx); err == nil {
+				data := capCtx.Metric.Data()
+				fmt.Printf("captures frames: %.2f\n", data.GetCount(metrics.MetricFrameCounter).Sum)
+				fmt.Printf("total screen cap time: %.2fs\n", data.GetSample(metrics.MetricSampleCaptureController).Sum/float64(time.Second))
+				maxFramerate := data.GetCount(metrics.MetricFrameCounter).Sum / (data.GetSample(metrics.MetricSampleCaptureController).Sum / float64(time.Second))
+				fmt.Printf("max possible framerate: %.2ffps\n", maxFramerate)
 
-				if count%100 == 0 {
-					elapsed := time.Now().Sub(res.T)
-					elapsedTotal := time.Now().Sub(start)
-
-					fmt.Println("-----------------")
-					fmt.Printf("exec time: %dms, %fs\n", elapsed.Milliseconds(), elapsed.Seconds())
-					fmt.Printf("avg cap time: %dms, %fs, FPS: %d\n", elapsedTotal.Milliseconds()/int64(count), elapsedTotal.Seconds()/float64(count), int64(count)/(elapsedTotal.Milliseconds()/1000))
-					fmt.Printf("milliseconds: %d, Frames: %d\n", elapsedTotal.Milliseconds(), count)
-				}
+				fmt.Printf("screen cap rate: %.2f\n", data.GetSample(metrics.MetricSampleCaptureController).Rate/float64(time.Millisecond))
+				fmt.Printf("avg screen cap time: %.2fms\n", data.GetSample(metrics.MetricSampleCaptureController).Mean()/float64(time.Millisecond))
+				fmt.Printf("avg handle time [client1]: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client1").Mean()/float64(time.Millisecond))
+				fmt.Printf("avg handle time [client2]: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client2").Mean()/float64(time.Millisecond))
+				fmt.Printf("avg pipeline time [client1]: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client1").Mean()/float64(time.Millisecond))
+				fmt.Printf("avg pipeline time [client2]: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client2").Mean()/float64(time.Millisecond))
+			} else {
+				log.Println("unable to get context")
 			}
 		}
-	}()
+
+	})
+	viewportCaptureController.AddListener(loggingListener)
+
+	viewportCaptureController.Start()
 
 	signal.Notify(quit, os.Interrupt)
 

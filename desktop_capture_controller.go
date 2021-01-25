@@ -2,6 +2,8 @@ package cockpit_stream
 
 import (
 	"context"
+	"errors"
+	"github.com/jcloutz/cockpit_stream/metrics"
 	"image"
 	"image/draw"
 	"sync"
@@ -16,25 +18,38 @@ const (
 
 type CaptureContext struct {
 	StartTime time.Time
-	Metric    *MetricsService
+	Metric    *metrics.Service
 	ClientId  string
 }
 
-type ViewportCaptureResult struct {
+func GetCaptureContext(ctx context.Context) (*CaptureContext, error) {
+	capCtx, ok := ctx.Value(CaptureContextKey).(*CaptureContext)
+	if !ok {
+		return nil, errors.New("capture context not found")
+	}
+
+	return capCtx, nil
+}
+
+type ScreenCaptureResult struct {
 	T      time.Time
 	screen *image.RGBA
 	mutex  sync.RWMutex
-	ctx    context.Context
+	Ctx    context.Context
 }
 
-func (scr *ViewportCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
+func (vpr *ScreenCaptureResult) GetCaptureContext() (*CaptureContext, error) {
+	return GetCaptureContext(vpr.Ctx)
+}
+
+func (scr *ScreenCaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
 	scr.mutex.RLock()
 	defer scr.mutex.RUnlock()
 
 	draw.Draw(dst, bounds, scr.screen, at, draw.Src)
 }
 
-type ViewportCaptureController struct {
+type DesktopCaptureController struct {
 	captureFps int
 
 	bounds      image.Rectangle
@@ -43,18 +58,18 @@ type ViewportCaptureController struct {
 	ticker     *time.Ticker
 	tickerDone chan bool
 
-	listeners      []chan *ViewportCaptureResult
+	listeners      []CaptureResultHandler
 	listenersMutex sync.RWMutex
-	metricsService *MetricsService
+	metricsService *metrics.Service
 }
 
 type ViewCaptureControllerConfig struct {
 	TargetCaptureFps int
 	Bounds           image.Rectangle
-	Metrics          *MetricsService
+	Metrics          *metrics.Service
 }
 
-func NewViewportCaptureController(configure func(config *ViewCaptureControllerConfig)) *ViewportCaptureController {
+func NewViewportCaptureController(configure func(config *ViewCaptureControllerConfig)) *DesktopCaptureController {
 	cfg := ViewCaptureControllerConfig{
 		TargetCaptureFps: 30,
 		Bounds:           image.Rect(0, 0, 100, 100),
@@ -62,13 +77,14 @@ func NewViewportCaptureController(configure func(config *ViewCaptureControllerCo
 
 	configure(&cfg)
 
-	return &ViewportCaptureController{
-		captureFps: cfg.TargetCaptureFps,
-		bounds:     cfg.Bounds,
+	return &DesktopCaptureController{
+		captureFps:     cfg.TargetCaptureFps,
+		bounds:         cfg.Bounds,
+		metricsService: cfg.Metrics,
 	}
 }
 
-func (scc *ViewportCaptureController) run() {
+func (scc *DesktopCaptureController) run() {
 	timeout := 1000 / scc.captureFps
 	scc.ticker = time.NewTicker(time.Duration(timeout) * time.Millisecond)
 	scc.tickerDone = make(chan bool)
@@ -80,7 +96,7 @@ func (scc *ViewportCaptureController) run() {
 				start := time.Now()
 
 				ctx := context.Background()
-				ctx = context.WithValue(ctx, CaptureContextKey, CaptureContext{
+				ctx = context.WithValue(ctx, CaptureContextKey, &CaptureContext{
 					StartTime: time.Now(),
 					Metric:    scc.metricsService,
 					ClientId:  "",
@@ -94,19 +110,20 @@ func (scc *ViewportCaptureController) run() {
 				}
 
 				// create result
-				result := ViewportCaptureResult{
+				result := ScreenCaptureResult{
 					screen: img,
 					T:      start,
-					ctx:    ctx,
+					Ctx:    ctx,
 				}
 
 				// notify listeners
 				scc.listenersMutex.RLock()
 				for _, listener := range scc.listeners {
-					listener <- &result
+					listener.Handle(&result)
 				}
 				scc.listenersMutex.RUnlock()
-				scc.metricsService.MeasureTime(start, ScreenCapure)
+				scc.metricsService.MeasureTime(start, metrics.MetricSampleCaptureController)
+				scc.metricsService.Count(metrics.MetricFrameCounter, 1)
 			case <-scc.tickerDone:
 				close(scc.tickerDone)
 				scc.ticker.Stop()
@@ -117,14 +134,14 @@ func (scc *ViewportCaptureController) run() {
 	}()
 }
 
-func (scc *ViewportCaptureController) AddListener(listener chan *ViewportCaptureResult) {
+func (scc *DesktopCaptureController) AddListener(listener CaptureResultHandler) {
 	scc.listenersMutex.Lock()
 	defer scc.listenersMutex.Unlock()
 
 	scc.listeners = append(scc.listeners, listener)
 }
 
-func (scc *ViewportCaptureController) RemoveListener(listener chan *ViewportCaptureResult) {
+func (scc *DesktopCaptureController) RemoveListener(listener CaptureResultHandler) {
 	scc.listenersMutex.Lock()
 	defer scc.listenersMutex.Lock()
 
@@ -135,17 +152,17 @@ func (scc *ViewportCaptureController) RemoveListener(listener chan *ViewportCapt
 	}
 }
 
-func (scc *ViewportCaptureController) SetBounds(bounds image.Rectangle) {
+func (scc *DesktopCaptureController) SetBounds(bounds image.Rectangle) {
 	scc.boundsMutex.Lock()
 	defer scc.boundsMutex.Unlock()
 
 	scc.bounds = bounds
 }
 
-func (scc *ViewportCaptureController) Start() {
+func (scc *DesktopCaptureController) Start() {
 	scc.run()
 }
 
-func (scc *ViewportCaptureController) Stop() {
+func (scc *DesktopCaptureController) Stop() {
 	scc.tickerDone <- true
 }

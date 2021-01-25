@@ -145,7 +145,7 @@ func (vm *ViewportContainer) recomputeBounds() {
 	vm.EachMutate(func(name string, viewport *Viewport) {
 		offset := viewport.GetRealOffset()
 
-		viewport.adjOffset = offset.Sub(image.Point{
+		viewport.slicePosition = offset.Sub(image.Point{
 			X: minX,
 			Y: minY,
 		})
