@@ -45,7 +45,8 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 		go func(viewport *Viewport) {
 			viewport.RLock()
 			defer viewport.RUnlock()
-			result.Slice(sch.curImage, viewport.Bounds, viewport.SlicePosition)
+			sVp, _ := sch.serverViewports.Get(hVp.Name)
+			result.Slice(sch.curImage, sVp)
 			wg.Done()
 		}(hVp)
 	}
@@ -84,8 +85,7 @@ func (sch *ScreenCaptureHandler) RegisterViewport(name string, posX int, posY in
 		Name: name,
 		// get the top left corner of the viewport as represented in
 		// the desktop capture from the CaptureResult in Handle()
-		SlicePosition: viewport.SlicePosition,
-		Position:      image.Point{X: posX, Y: posY},
+		Position: image.Point{X: posX, Y: posY},
 	}
 
 	if err = sch.recalculateBounds(); err != nil {

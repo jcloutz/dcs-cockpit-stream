@@ -19,13 +19,6 @@ type Viewport struct {
 	// True Bounds of the viewport
 	Bounds image.Rectangle
 
-	// SlicePosition is the location that should be used
-	// when slicing the viewport into or out of the current
-	// screen capture. This value is calculated by the
-	// ViewportManager and cached here in the viewport when
-	// the capture Bounds are recalculated
-	SlicePosition image.Point
-
 	// Position is the viewports location as it is rendered
 	// on screen. It is used to help define capture Bounds
 	// for the screen capture controller
@@ -42,18 +35,11 @@ func NewViewport(name string, x int, y int, width int, height int) *Viewport {
 	}
 }
 
-func NewViewportWithSlice(name string, x int, y int, width int, height int, sliceAt image.Point) *Viewport {
-	vp := NewViewport(name, x, y, width, height)
-	vp.SlicePosition = sliceAt
-
-	return vp
-}
-
-func (vp *Viewport) Slice(dst *image.RGBA, src *image.RGBA) {
+func (vp *Viewport) Slice(dst *image.RGBA, src *image.RGBA, offset image.Point) {
 	vp.mutex.RLock()
 	defer vp.mutex.RUnlock()
 
-	draw.Draw(dst, vp.Bounds, src, vp.SlicePosition, draw.Src)
+	draw.Draw(dst, vp.Bounds, src, offset, draw.Src)
 }
 
 // Lock the Viewport for mutation

@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"image"
-	"image/draw"
 	"sync"
 	"time"
 )
 
 type CaptureResult struct {
 	T      time.Time
-	screen *image.RGBA
+	screen *OffsetImage
 	mutex  sync.RWMutex
 	Ctx    context.Context
 }
@@ -25,9 +24,9 @@ func (cr *CaptureResult) GetCaptureContext() (*CaptureContext, error) {
 	return capCtx, nil
 }
 
-func (cr *CaptureResult) Slice(dst *image.RGBA, bounds image.Rectangle, at image.Point) {
+func (cr *CaptureResult) Slice(dst *image.RGBA, viewport *Viewport) {
 	cr.mutex.RLock()
 	defer cr.mutex.RUnlock()
 
-	draw.Draw(dst, bounds, cr.screen, at, draw.Src)
+	cr.screen.Slice(dst, viewport)
 }

@@ -23,7 +23,7 @@ func main() {
 	// create viewports
 	viewports := cockpit_stream.NewViewportContainer()
 	for id, vp := range cfg.Viewports {
-		viewports.Add(cockpit_stream.NewViewport(id, vp.PosX, vp.PosY, vp.Width, vp.Height))
+		viewports.Add(id, vp.PosX, vp.PosY, vp.Width, vp.Height)
 	}
 
 	// Create handlers
@@ -34,6 +34,7 @@ func main() {
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
+			handler.EnableOutput("output")
 		}
 
 		handlers = append(handlers, handler)
@@ -43,6 +44,7 @@ func main() {
 	viewportCaptureController := cockpit_stream.NewDesktopCaptureController(func(smConfig *cockpit_stream.DesktopCaptureControllerConfig) {
 		smConfig.TargetCaptureFps = cfg.FramesPerSecond
 		smConfig.Metrics = metricService
+		smConfig.LocationProvider = viewports
 	})
 	viewportCaptureController.SetBounds(viewports.Bounds())
 

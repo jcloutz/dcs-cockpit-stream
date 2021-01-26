@@ -35,8 +35,15 @@ func (vm *ViewportContainer) Has(key string) bool {
 
 	return ok
 }
+func (vm *ViewportContainer) Add(id string, x, y, width, height int) {
+	vm.mutex.Lock()
+	vm.data[id] = NewViewport(id, x, y, width, height)
+	vm.mutex.Unlock()
 
-func (vm *ViewportContainer) Add(viewport *Viewport) {
+	vm.recomputeBounds()
+}
+
+func (vm *ViewportContainer) AddViewport(viewport *Viewport) {
 	vm.mutex.Lock()
 	vm.data[viewport.Name] = viewport
 	vm.mutex.Unlock()
@@ -75,7 +82,7 @@ func (vm *ViewportContainer) Bounds() image.Rectangle {
 	return vm.bounds
 }
 
-func (vm *ViewportContainer) BoundsOffset() image.Point {
+func (vm *ViewportContainer) Offset() image.Point {
 	return vm.boundsOffset
 }
 
@@ -118,19 +125,8 @@ func (vm *ViewportContainer) recomputeBounds() {
 		}
 	})
 
+	vm.mutex.Lock()
+	defer vm.mutex.Unlock()
 	vm.bounds = image.Rect(minX, minY, maxX, maxY)
 	vm.boundsOffset = image.Point{X: minX, Y: minY}
-
-	vm.Each(func(name string, viewport *Viewport) {
-		viewport.Lock()
-		defer viewport.Unlock()
-
-		offset := viewport.Position
-
-		// cache the offset in the viewport
-		viewport.SlicePosition = offset.Sub(image.Point{
-			X: minX,
-			Y: minY,
-		})
-	})
 }

@@ -20,7 +20,7 @@ func TestViewportContainer_Add(t *testing.T) {
 	viewport := NewViewport(testId, 0, 0, 10, 10)
 
 	container := NewViewportContainer()
-	container.Add(viewport)
+	container.Add(testId, 0, 0, 10, 10)
 
 	assert.Equal(t, viewport, container.data[testId])
 }
@@ -30,7 +30,7 @@ func TestViewportContainer_Get(t *testing.T) {
 	viewport := NewViewport(testId, 0, 0, 10, 10)
 
 	container := NewViewportContainer()
-	container.Add(viewport)
+	container.data[testId] = viewport
 
 	fetchedVp, err := container.Get(testId)
 	if err != nil {
@@ -46,14 +46,16 @@ func TestViewportContainer_Has(t *testing.T) {
 	viewport := &Viewport{Name: testId}
 
 	container := NewViewportContainer()
-	container.Add(viewport)
+	container.data[testId] = viewport
+
+	assert.True(t, container.Has(testId))
 }
 
 func TestViewportContainer_Count(t *testing.T) {
 	container := NewViewportContainer()
 
-	container.Add(&Viewport{Name: "vp 1"})
-	container.Add(&Viewport{Name: "vp 2"})
+	container.data["vp 1"] = &Viewport{Name: "vp 1"}
+	container.data["vp 2"] = &Viewport{Name: "vp 2"}
 
 	assert.Len(t, container.data, 2)
 }
@@ -89,7 +91,7 @@ func TestViewportContainer_Bounds(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.Add(vp)
+			container.AddViewport(vp)
 		}
 
 		assert.Equal(t, tc.expectedBounds, container.Bounds())
@@ -134,10 +136,10 @@ func TestViewportContainer_Offset(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.Add(vp)
+			container.AddViewport(vp)
 		}
 
-		assert.Equal(t, tc.expectedOffset, container.BoundsOffset())
+		assert.Equal(t, tc.expectedOffset, container.Offset())
 	}
 }
 
@@ -184,7 +186,7 @@ func TestViewportContainer_ViewportOffset(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.Add(vp)
+			container.AddViewport(vp)
 		}
 
 		offset, err := container.ViewportOffset(container.data[tc.testId])
@@ -192,7 +194,6 @@ func TestViewportContainer_ViewportOffset(t *testing.T) {
 			log.Fatal(err)
 		}
 		assert.Equal(t, tc.expectedOffset, offset, fmt.Sprintf("test index %d \ntestId: %s \nbounds: %v \nboundsOffset: %v\n", idx, tc.testId, container.bounds, container.boundsOffset))
-		assert.Equal(t, tc.expectedOffset, container.data[tc.testId].SlicePosition)
 	}
 }
 
@@ -225,7 +226,7 @@ func TestViewportContainer_Each(t *testing.T) {
 	} {
 		container := NewViewportContainer()
 		for _, vp := range tc.viewports {
-			container.Add(vp)
+			container.AddViewport(vp)
 		}
 
 		calls := 0

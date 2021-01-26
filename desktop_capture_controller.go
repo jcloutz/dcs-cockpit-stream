@@ -11,6 +11,11 @@ import (
 	"github.com/kbinani/screenshot"
 )
 
+type CaptureLocationProvider interface {
+	Bounds() image.Rectangle
+	Offset() image.Point
+}
+
 type DesktopCaptureController struct {
 	captureFps int
 
@@ -22,12 +27,15 @@ type DesktopCaptureController struct {
 
 	notifier       *CaptureResultNotifier
 	metricsService *metrics.Service
+
+	locationProvider CaptureLocationProvider
 }
 
 type DesktopCaptureControllerConfig struct {
 	TargetCaptureFps int
 	Bounds           image.Rectangle
 	Metrics          *metrics.Service
+	LocationProvider CaptureLocationProvider
 }
 
 func NewDesktopCaptureController(configure func(config *DesktopCaptureControllerConfig)) *DesktopCaptureController {
@@ -39,10 +47,11 @@ func NewDesktopCaptureController(configure func(config *DesktopCaptureController
 	configure(&cfg)
 
 	return &DesktopCaptureController{
-		captureFps:     cfg.TargetCaptureFps,
-		bounds:         cfg.Bounds,
-		metricsService: cfg.Metrics,
-		notifier:       NewCaptureResultNotifier(),
+		captureFps:       cfg.TargetCaptureFps,
+		bounds:           cfg.Bounds,
+		metricsService:   cfg.Metrics,
+		notifier:         NewCaptureResultNotifier(),
+		locationProvider: cfg.LocationProvider,
 	}
 }
 
@@ -62,7 +71,7 @@ func (scc *DesktopCaptureController) execute() error {
 
 	// capture image
 	scc.boundsMutex.RLock()
-	img, err := screenshot.CaptureRect(scc.bounds)
+	img, err := screenshot.CaptureRect(scc.locationProvider.Bounds())
 	scc.boundsMutex.RUnlock()
 	if err != nil {
 		return err
@@ -70,7 +79,7 @@ func (scc *DesktopCaptureController) execute() error {
 
 	// create result
 	result := CaptureResult{
-		screen: img,
+		screen: NewOffsetImage(img, scc.locationProvider.Offset()),
 		T:      start,
 		Ctx:    ctx,
 	}
