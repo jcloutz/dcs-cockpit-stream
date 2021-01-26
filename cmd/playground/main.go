@@ -2,36 +2,13 @@ package main
 
 import (
 	"fmt"
+	"image"
 )
 
 func main() {
-	bar := &Bar{
-		&Foo{},
-	}
 
-	bar.Hello()
-}
+	img1 := image.RGBA{}
 
-type Foo struct {
-}
+	fmt.Println(img1.Rect)
 
-func (f *Foo) Hello() {
-	fmt.Println("Foo -> Hello")
-	f.FooBin()
 }
-func (f *Foo) FooBin() {
-	fmt.Println("Foo -> FooBin")
-}
-
-type Bar struct {
-	*Foo
-}
-
-func (f *Bar) Hello() {
-	fmt.Println("Bar -> Hello")
-	f.FooBin()
-}
-
-//func (f *Bar) FooBin() {
-//	fmt.Println("Bar -> FooBin")
-//}

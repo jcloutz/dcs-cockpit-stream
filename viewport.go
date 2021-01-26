@@ -14,50 +14,65 @@ import (
 // mutex locks
 type Viewport struct {
 	// Name of the viewport
-	Name string
+	name string
 
 	// True Bounds of the viewport
-	Bounds image.Rectangle
+	bounds image.Rectangle
 
 	// Position is the viewports location as it is rendered
 	// on screen. It is used to help define capture Bounds
 	// for the screen capture controller
-	Position image.Point
+	position image.Point
 
 	mutex sync.RWMutex
 }
 
 func NewViewport(name string, x int, y int, width int, height int) *Viewport {
 	return &Viewport{
-		Name:     name,
-		Bounds:   image.Rect(0, 0, width, height),
-		Position: image.Point{X: x, Y: y},
+		name:     name,
+		bounds:   image.Rect(0, 0, width, height),
+		position: image.Point{X: x, Y: y},
 	}
+}
+
+func (vp *Viewport) Name() string {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	return vp.name
+}
+
+func (vp *Viewport) Width() int {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	return vp.bounds.Dx()
+}
+
+func (vp *Viewport) Height() int {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	return vp.bounds.Dy()
+}
+
+func (vp *Viewport) Position() image.Point {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	return vp.position
+}
+
+func (vp *Viewport) Bounds() image.Rectangle {
+	vp.mutex.RLock()
+	defer vp.mutex.RUnlock()
+
+	return vp.bounds
 }
 
 func (vp *Viewport) Slice(dst *image.RGBA, src *image.RGBA, offset image.Point) {
 	vp.mutex.RLock()
 	defer vp.mutex.RUnlock()
 
-	draw.Draw(dst, vp.Bounds, src, offset, draw.Src)
-}
-
-// Lock the Viewport for mutation
-func (vp *Viewport) Lock() {
-	vp.mutex.Lock()
-}
-
-// Unlock the Viewport after mutation
-func (vp *Viewport) Unlock() {
-	vp.mutex.Unlock()
-}
-
-// RLock the Viewport for reading
-func (vp *Viewport) RLock() {
-	vp.mutex.RLock()
-}
-
-// RUnlock the Viewport after reading
-func (vp *Viewport) RUnlock() {
-	vp.mutex.RUnlock()
+	draw.Draw(dst, vp.bounds, src, offset, draw.Src)
 }

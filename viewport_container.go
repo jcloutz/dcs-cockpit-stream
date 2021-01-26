@@ -35,6 +35,7 @@ func (vm *ViewportContainer) Has(key string) bool {
 
 	return ok
 }
+
 func (vm *ViewportContainer) Add(id string, x, y, width, height int) {
 	vm.mutex.Lock()
 	vm.data[id] = NewViewport(id, x, y, width, height)
@@ -43,13 +44,13 @@ func (vm *ViewportContainer) Add(id string, x, y, width, height int) {
 	vm.recomputeBounds()
 }
 
-func (vm *ViewportContainer) AddViewport(viewport *Viewport) {
-	vm.mutex.Lock()
-	vm.data[viewport.Name] = viewport
-	vm.mutex.Unlock()
-
-	vm.recomputeBounds()
-}
+//func (vm *ViewportContainer) AddViewport(viewport *Viewport) {
+//	vm.mutex.Lock()
+//	vm.data[viewport.Name] = viewport
+//	vm.mutex.Unlock()
+//
+//	vm.recomputeBounds()
+//}
 
 func (vm *ViewportContainer) Get(key string) (*Viewport, error) {
 	vm.mutex.RLock()
@@ -87,9 +88,7 @@ func (vm *ViewportContainer) Offset() image.Point {
 }
 
 func (vm *ViewportContainer) ViewportOffset(viewport *Viewport) (image.Point, error) {
-	viewport.RLock()
-	defer viewport.RUnlock()
-	return viewport.Position.Sub(vm.boundsOffset), nil
+	return viewport.Position().Sub(vm.boundsOffset), nil
 }
 
 // recomputeBounds will adjust
@@ -101,11 +100,8 @@ func (vm *ViewportContainer) recomputeBounds() {
 	maxY := math.MinInt16
 
 	vm.Each(func(name string, viewport *Viewport) {
-		viewport.RLock()
-		defer viewport.RUnlock()
-
-		bounds := viewport.Bounds
-		offset := viewport.Position
+		bounds := viewport.Bounds()
+		offset := viewport.Position()
 
 		if offset.X < minX {
 			minX = offset.X

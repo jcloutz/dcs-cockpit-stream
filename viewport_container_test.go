@@ -38,12 +38,12 @@ func TestViewportContainer_Get(t *testing.T) {
 	}
 
 	assert.Equal(t, viewport, fetchedVp)
-	assert.Equal(t, viewport.Name, fetchedVp.Name)
+	assert.Equal(t, viewport.name, fetchedVp.name)
 }
 
 func TestViewportContainer_Has(t *testing.T) {
 	testId := "test_viewport"
-	viewport := &Viewport{Name: testId}
+	viewport := &Viewport{name: testId}
 
 	container := NewViewportContainer()
 	container.data[testId] = viewport
@@ -54,8 +54,8 @@ func TestViewportContainer_Has(t *testing.T) {
 func TestViewportContainer_Count(t *testing.T) {
 	container := NewViewportContainer()
 
-	container.data["vp 1"] = &Viewport{Name: "vp 1"}
-	container.data["vp 2"] = &Viewport{Name: "vp 2"}
+	container.data["vp 1"] = &Viewport{name: "vp 1"}
+	container.data["vp 2"] = &Viewport{name: "vp 2"}
 
 	assert.Len(t, container.data, 2)
 }
@@ -91,8 +91,9 @@ func TestViewportContainer_Bounds(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.AddViewport(vp)
+			container.data[vp.name] = vp
 		}
+		container.recomputeBounds()
 
 		assert.Equal(t, tc.expectedBounds, container.Bounds())
 	}
@@ -136,8 +137,9 @@ func TestViewportContainer_Offset(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.AddViewport(vp)
+			container.data[vp.name] = vp
 		}
+		container.recomputeBounds()
 
 		assert.Equal(t, tc.expectedOffset, container.Offset())
 	}
@@ -186,8 +188,9 @@ func TestViewportContainer_ViewportOffset(t *testing.T) {
 		container := NewViewportContainer()
 
 		for _, vp := range tc.viewports {
-			container.AddViewport(vp)
+			container.data[vp.name] = vp
 		}
+		container.recomputeBounds()
 
 		offset, err := container.ViewportOffset(container.data[tc.testId])
 		if err != nil {
@@ -204,30 +207,31 @@ func TestViewportContainer_Each(t *testing.T) {
 	}{
 		{
 			viewports: []*Viewport{
-				&Viewport{Name: "vp 1"},
+				&Viewport{name: "vp 1"},
 			},
 			expectedCalls: 1,
 		},
 		{
 			viewports: []*Viewport{
-				&Viewport{Name: "vp 1"},
-				&Viewport{Name: "vp 2"},
+				&Viewport{name: "vp 1"},
+				&Viewport{name: "vp 2"},
 			},
 			expectedCalls: 2,
 		},
 		{
 			viewports: []*Viewport{
-				&Viewport{Name: "vp 1"},
-				&Viewport{Name: "vp 2"},
-				&Viewport{Name: "vp 3"},
+				&Viewport{name: "vp 1"},
+				&Viewport{name: "vp 2"},
+				&Viewport{name: "vp 3"},
 			},
 			expectedCalls: 3,
 		},
 	} {
 		container := NewViewportContainer()
 		for _, vp := range tc.viewports {
-			container.AddViewport(vp)
+			container.data[vp.name] = vp
 		}
+		container.recomputeBounds()
 
 		calls := 0
 		container.Each(func(name string, viewport *Viewport) {

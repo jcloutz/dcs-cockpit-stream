@@ -35,14 +35,14 @@ func (i *OffsetImage) CalcOffset(point image.Point) image.Point {
 	return point.Sub(i.offset)
 }
 
-func (i *OffsetImage) Slice(dst *image.RGBA, viewport *Viewport) {
+func (i *OffsetImage) Slice(dst *image.RGBA, destRect image.Rectangle, viewport *Viewport) {
 	i.mutex.RLock()
 	defer i.mutex.RUnlock()
 
-	offset := viewport.Position.Sub(i.offset)
+	offset := viewport.Position().Sub(i.offset)
 	SavePng(i.RGBA, "output/src.png")
 
-	draw.Draw(dst, viewport.Bounds, i, offset, draw.Src)
+	draw.Draw(dst, viewport.Bounds(), i, offset, draw.Src)
 }
 
 // Lock the Viewport for mutation
