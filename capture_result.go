@@ -24,9 +24,9 @@ func (cr *CaptureResult) GetCaptureContext() (*CaptureContext, error) {
 	return capCtx, nil
 }
 
-func (cr *CaptureResult) Slice(dst *image.RGBA, viewport *Viewport) {
+func (cr *CaptureResult) Slice(dst *image.RGBA, destRect image.Rectangle, srcPoint image.Point) {
 	cr.mutex.RLock()
 	defer cr.mutex.RUnlock()
 
-	cr.screen.Slice(dst, viewport)
+	cr.screen.Slice(dst, destRect, srcPoint)
 }

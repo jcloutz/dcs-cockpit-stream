@@ -3,6 +3,7 @@ package cockpit_stream
 import (
 	"errors"
 	"fmt"
+	"github.com/pierrec/lz4"
 	"image"
 	"image/draw"
 	"path"
@@ -15,16 +16,20 @@ import (
 var _ CaptureResultHandler = &ScreenCaptureHandler{}
 
 type ScreenCaptureHandler struct {
-	id               string
-	viewports        *ViewportContainer
-	serverViewports  *ViewportContainer
-	handlerViewports map[string]*Viewport
-	MetricsService   *metrics.Service
-	outputImage      bool
-	outputPath       string
-	prevImage        *image.RGBA
-	curImage         *image.RGBA
-	clientRenderPos  map[string]image.Point
+	id              string
+	viewports       *ViewportContainer
+	serverViewports *ViewportContainer
+	metricsService  *metrics.Service
+	outputImage     bool
+	outputPath      string
+	prevImage       *image.RGBA
+	curImage        *image.RGBA
+	clientRenderPos map[string]image.Point
+
+	xorMask           *image.RGBA
+	compressionBuffer []byte
+
+	mutex sync.RWMutex
 }
 
 func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *metrics.Service) *ScreenCaptureHandler {
@@ -32,7 +37,7 @@ func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *
 		id:              id,
 		serverViewports: container,
 		viewports:       NewViewportContainer(),
-		MetricsService:  metrics,
+		metricsService:  metrics,
 		prevImage:       &image.RGBA{},
 		curImage:        &image.RGBA{},
 		clientRenderPos: make(map[string]image.Point),
@@ -40,7 +45,10 @@ func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *
 }
 
 func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
-	defer sch.MetricsService.MeasureTimeForClient(time.Now(), metrics.MetricSampleViewportHandler, sch.id)
+	sch.mutex.Lock()
+	defer sch.mutex.Unlock()
+
+	defer sch.metricsService.MeasureTimeForClient(time.Now(), metrics.MetricSampleViewportHandler, sch.id)
 	ctx, _ := result.GetCaptureContext()
 
 	var wg sync.WaitGroup
@@ -53,24 +61,17 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 			return
 		}
 
-		result.Slice(sch.curImage, viewport)
-		wg.Done()
+		go func() {
+			result.Slice(sch.curImage, viewport.PositionRect(), serverViewport.Point())
+			wg.Done()
+		}()
 	})
-	//for _, hVp := range sch.handlerViewports {
-	//	go func(viewport *Viewport) {
-	//		sVp, _ := sch.serverViewports.Get(hVp.Name())
-	//		result.Slice(sch.curImage, sVp)
-	//		wg.Done()
-	//	}(hVp)
-	//}
 	wg.Wait()
 
 	if sch.outputImage {
 		SavePng(sch.curImage, path.Join(sch.outputPath, fmt.Sprintf("%s.png", sch.id)))
 	}
 
-	// imgPrev
-	// imgCur
 	// encryption buffer
 	// compression buffer
 
@@ -83,10 +84,12 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	sch.prevImage = sch.curImage
 	sch.curImage = tmp
 
-	sch.MetricsService.MeasureTimeForClient(ctx.StartTime, metrics.MetricPipelineExecutionTime, sch.id)
+	sch.metricsService.MeasureTimeForClient(ctx.StartTime, metrics.MetricPipelineExecutionTime, sch.id)
 }
 
 func (sch *ScreenCaptureHandler) RegisterViewport(name string, posX int, posY int) error {
+	sch.mutex.Lock()
+	defer sch.mutex.Unlock()
 	// check to see if the viewport is already registered
 	if exists := sch.viewports.Has(name); exists {
 		return errors.New("viewport already registered with handler")
@@ -113,48 +116,15 @@ func (sch *ScreenCaptureHandler) RegisterViewport(name string, posX int, posY in
 	sch.curImage = newCurImage
 	sch.prevImage = newPrevImage
 
-	sch.viewports.Add(name, newCurImage.Rect.Dx(), 0, viewport.Width(), viewport.Height())
+	// create new xor mask
+	sch.xorMask = image.NewRGBA(sch.viewports.Bounds())
 
 	sch.clientRenderPos[name] = image.Point{X: posX, Y: posY}
 
+	sch.compressionBuffer = make([]byte, lz4.CompressBlockBound(len(sch.xorMask.Pix)))
+
 	return nil
 }
-
-//func (sch *ScreenCaptureHandler) recalculateBounds() error {
-//	height := 0
-//	width := 0
-//
-//	for id, hViewport := range sch.handlerViewports {
-//		viewport, err := sch.serverViewports.Get(id)
-//		if err != nil {
-//			return err
-//		}
-//
-//		viewport.RLock()
-//		bounds := viewport.Bounds
-//		viewport.RUnlock()
-//
-//		hViewport.Lock()
-//		hViewport.Bounds = image.Rect(
-//			width,
-//			0,
-//			width+bounds.Dx(),
-//			bounds.Dy(),
-//		)
-//		hViewport.Unlock()
-//
-//		width += bounds.Dx()
-//		if bounds.Dy() > height {
-//			height = bounds.Dy()
-//		}
-//	}
-//
-//	newImageSize := image.Rect(0, 0, width, height)
-//	sch.prevImage = image.NewRGBA(newImageSize)
-//	sch.curImage = image.NewRGBA(newImageSize)
-//
-//	return nil
-//}
 
 func (sch *ScreenCaptureHandler) EnableOutput(path string) {
 	sch.outputImage = true

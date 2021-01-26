@@ -44,14 +44,6 @@ func (vm *ViewportContainer) Add(id string, x, y, width, height int) {
 	vm.recomputeBounds()
 }
 
-//func (vm *ViewportContainer) AddViewport(viewport *Viewport) {
-//	vm.mutex.Lock()
-//	vm.data[viewport.Name] = viewport
-//	vm.mutex.Unlock()
-//
-//	vm.recomputeBounds()
-//}
-
 func (vm *ViewportContainer) Get(key string) (*Viewport, error) {
 	vm.mutex.RLock()
 	defer vm.mutex.RUnlock()
@@ -83,15 +75,19 @@ func (vm *ViewportContainer) Bounds() image.Rectangle {
 	return vm.bounds
 }
 
+// Offset is the min x, min y of the sliding window that the
+// combined viewports represent
 func (vm *ViewportContainer) Offset() image.Point {
 	return vm.boundsOffset
 }
 
+// ViewportOffset applies the viewports offset value to the provided
+// image.Point
 func (vm *ViewportContainer) ViewportOffset(viewport *Viewport) (image.Point, error) {
-	return viewport.Position().Sub(vm.boundsOffset), nil
+	return viewport.Point().Sub(vm.boundsOffset), nil
 }
 
-// recomputeBounds will adjust
+// recomputeBounds will adjust overall dimensions of the combined viewport capture area
 func (vm *ViewportContainer) recomputeBounds() {
 	minX := math.MaxInt16
 	maxX := math.MinInt16
@@ -99,9 +95,12 @@ func (vm *ViewportContainer) recomputeBounds() {
 	minY := math.MaxInt16
 	maxY := math.MinInt16
 
-	vm.Each(func(name string, viewport *Viewport) {
-		bounds := viewport.Bounds()
-		offset := viewport.Position()
+	vm.mutex.Lock()
+	defer vm.mutex.Unlock()
+
+	for _, viewport := range vm.data {
+		bounds := viewport.SizeRect()
+		offset := viewport.Point()
 
 		if offset.X < minX {
 			minX = offset.X
@@ -119,10 +118,9 @@ func (vm *ViewportContainer) recomputeBounds() {
 		if maxOffsetY > maxY {
 			maxY = maxOffsetY
 		}
-	})
 
-	vm.mutex.Lock()
-	defer vm.mutex.Unlock()
+	}
+
 	vm.bounds = image.Rect(minX, minY, maxX, maxY)
 	vm.boundsOffset = image.Point{X: minX, Y: minY}
 }
