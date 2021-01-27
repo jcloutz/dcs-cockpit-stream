@@ -41,7 +41,7 @@ func (i *OffsetImage) Slice(dst *image.RGBA, destRect image.Rectangle, at image.
 
 	offset := at.Sub(i.offset)
 
-	draw.Draw(dst, destRect, i, offset, draw.Src)
+	draw.Draw(dst, destRect, i.RGBA, offset, draw.Src)
 }
 
 func (i *OffsetImage) SliceRaw(dst *image.RGBA, destRect image.Rectangle, at image.Point) {

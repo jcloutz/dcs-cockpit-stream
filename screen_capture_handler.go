@@ -3,7 +3,6 @@ package cockpit_stream
 import (
 	"errors"
 	"fmt"
-	"github.com/pierrec/lz4"
 	"image"
 	"image/draw"
 	"path"
@@ -26,8 +25,8 @@ type ScreenCaptureHandler struct {
 	curImage        *image.RGBA
 	clientRenderPos map[string]image.Point
 
-	xorMask           *image.RGBA
-	compressionBuffer []byte
+	xorMask           *Buffer
+	compressionBuffer *Buffer
 
 	mutex sync.RWMutex
 }
@@ -53,7 +52,6 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 
 	var wg sync.WaitGroup
 	wg.Add(sch.viewports.Count())
-
 	sch.viewports.Each(func(name string, viewport *Viewport) {
 		serverViewport, err := sch.serverViewports.Get(name)
 		if err != nil {
@@ -76,7 +74,14 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	// compression buffer
 
 	// compute xor mask
+	if err := CalculateBitmask(sch.prevImage, sch.curImage, sch.xorMask); err != nil {
+		// TODO: handle error
+	}
 	// compress mask
+	if _, err := CompressBuffer(sch.xorMask); err != nil {
+		// TODO: handle error
+	}
+
 	// send
 
 	// shuffle screens for reuse
@@ -117,11 +122,11 @@ func (sch *ScreenCaptureHandler) RegisterViewport(name string, posX int, posY in
 	sch.prevImage = newPrevImage
 
 	// create new xor mask
-	sch.xorMask = image.NewRGBA(sch.viewports.Bounds())
+	sch.xorMask = NewBuffer(newCurImage.Rect.Dx(), newCurImage.Rect.Dy())
 
 	sch.clientRenderPos[name] = image.Point{X: posX, Y: posY}
 
-	sch.compressionBuffer = make([]byte, lz4.CompressBlockBound(len(sch.xorMask.Pix)))
+	sch.compressionBuffer = NewCompressionBuffer(len(sch.xorMask.Bytes))
 
 	return nil
 }

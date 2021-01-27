@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/jcloutz/cockpit_stream"
@@ -34,7 +33,7 @@ func main() {
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
-			handler.EnableOutput("output")
+			//handler.EnableOutput("output")
 		}
 
 		handlers = append(handlers, handler)
@@ -84,12 +83,12 @@ func main() {
 	})
 	viewportCaptureController.AddListener(loggingListener)
 
-	err = viewportCaptureController.RunOnce()
-	if err != nil {
-		log.Fatal(err)
-	}
-	quit <- syscall.SIGINT
-	//viewportCaptureController.Run()
+	viewportCaptureController.Run()
+	//err = viewportCaptureController.RunOnce()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//quit <- syscall.SIGINT
 
 	signal.Notify(quit, os.Interrupt)
 

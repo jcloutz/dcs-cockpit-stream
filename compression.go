@@ -4,6 +4,14 @@ import (
 	"github.com/pierrec/lz4"
 )
 
+func NewCompressionBuffer(length int) *Buffer {
+	maxSize := lz4.CompressBlockBound(length)
+	return &Buffer{
+		Bytes: make([]byte, maxSize),
+		Size:  maxSize,
+	}
+}
+
 func CompressBuffer(buffer *Buffer) (int, error) {
 	size, err := lz4.CompressBlock(buffer.Bytes, buffer.Bytes, nil)
 	if err != nil {
