@@ -33,7 +33,6 @@ func main() {
 
 		for _, vpCfg := range client.Viewports {
 			handler.RegisterViewport(vpCfg.ID, vpCfg.DisplayX, vpCfg.DisplayY)
-			//handler.EnableOutput("output")
 		}
 
 		handlers = append(handlers, handler)
@@ -64,17 +63,26 @@ func main() {
 			fmt.Println("-----------------")
 			if capCtx, err := res.GetCaptureContext(); err == nil {
 				data := capCtx.Metric.Data()
+
 				fmt.Printf("captures frames: %.2f\n", data.GetCount(metrics.MetricFrameCounter).Sum)
 				fmt.Printf("total screen cap time: %.2fs\n", data.GetSample(metrics.MetricSampleCaptureController).Sum/float64(time.Second))
 				maxFramerate := data.GetCount(metrics.MetricFrameCounter).Sum / (data.GetSample(metrics.MetricSampleCaptureController).Sum / float64(time.Second))
 				fmt.Printf("max possible framerate: %.2ffps\n", maxFramerate)
 
-				fmt.Printf("screen cap rate: %.2f\n", data.GetSample(metrics.MetricSampleCaptureController).Rate/float64(time.Millisecond))
-				fmt.Printf("avg screen cap time: %.2fms\n", data.GetSample(metrics.MetricSampleCaptureController).Mean()/float64(time.Millisecond))
-				fmt.Printf("avg handle time [client1]: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client1").Mean()/float64(time.Millisecond))
-				fmt.Printf("avg handle time [client2]: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client2").Mean()/float64(time.Millisecond))
-				fmt.Printf("avg pipeline time [client1]: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client1").Mean()/float64(time.Millisecond))
-				fmt.Printf("avg pipeline time [client2]: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client2").Mean()/float64(time.Millisecond))
+				fmt.Printf("avg screen cap time: %.2fms\n\n", data.GetSample(metrics.MetricSampleCaptureController).Mean()/float64(time.Millisecond))
+
+				fmt.Printf("bandwidth: %.2fKb / frame\n", data.GetCount(metrics.MetricSampleBandwidth).Mean()/1024)
+				fmt.Printf("bandwidth: %.2fKb/s\n\n", data.GetCount(metrics.MetricSampleBandwidth).Mean()/1024*float64(cfg.FramesPerSecond))
+
+				fmt.Printf("[client1]avg handle time: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client1").Mean()/float64(time.Millisecond))
+				fmt.Printf("[client1]avg pipeline time: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client1").Mean()/float64(time.Millisecond))
+				fmt.Printf("[client1]bandwidth: %.2fKb / frame\n", data.GetCountForClient(metrics.MetricSampleBandwidth, "client1").Mean()/1024)
+				fmt.Printf("[client1]bandwidth: %.2fKb/s\n\n", data.GetCountForClient(metrics.MetricSampleBandwidth, "client1").Mean()/1024*data.GetCountForClient(metrics.MetricFrameCounter, "client1").Sum)
+
+				fmt.Printf("[client2]avg handle time: %.2fms\n", data.GetSampleForClient(metrics.MetricSampleViewportHandler, "client2").Mean()/float64(time.Millisecond))
+				fmt.Printf("[client2]avg pipeline time: %.2fms\n", data.GetSampleForClient(metrics.MetricPipelineExecutionTime, "client2").Mean()/float64(time.Millisecond))
+				fmt.Printf("[client2]bandwidth: %.2fKb / frame\n", data.GetCountForClient(metrics.MetricSampleBandwidth, "client2").Mean()/1024)
+				fmt.Printf("[client2]bandwidth: %.2fKb/s\n\n", data.GetCountForClient(metrics.MetricSampleBandwidth, "client2").Mean()/1024*data.GetCountForClient(metrics.MetricFrameCounter, "client2").Sum)
 			} else {
 				log.Println("unable to get context")
 			}

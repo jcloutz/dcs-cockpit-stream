@@ -13,6 +13,7 @@ const (
 	MetricSampleCaptureController MetricType = "capture-controller"
 	MetricSampleViewportHandler   MetricType = "viewport-handler"
 	MetricPipelineExecutionTime   MetricType = "pipeline-execution"
+	MetricSampleBandwidth         MetricType = "bandwidth"
 
 	// Counters
 	MetricFrameCounter MetricType = "frames"
@@ -23,7 +24,7 @@ type Service struct {
 }
 
 func New() *Service {
-	sink := metrics.NewInmemSink(5*time.Second, 10*time.Second)
+	sink := metrics.NewInmemSink(2*time.Second, 4*time.Second)
 
 	return &Service{
 		sink: sink,
@@ -43,11 +44,20 @@ func (m *Service) MeasureTimeForClient(start time.Time, name MetricType, clientI
 	m.sink.AddSampleWithLabels([]string{string(name)}, float32(elapsed.Nanoseconds()), []metrics.Label{{"client", clientId}})
 }
 
+func (m *Service) AddSample(name MetricType, val float32) {
+	m.sink.AddSample([]string{string(name)}, val)
+}
+
+func (m *Service) AddSampleForClient(name MetricType, clientId string, val float32) {
+	m.sink.AddSample([]string{string(name)}, val)
+	m.sink.AddSampleWithLabels([]string{string(name)}, val, []metrics.Label{{"client", clientId}})
+}
+
 func (m *Service) Count(name MetricType, amount float32) {
 	m.sink.IncrCounter([]string{string(name)}, amount)
 }
 
-func (m *Service) CountClient(name MetricType, amount float32, clientId string) {
+func (m *Service) CountClient(name MetricType, clientId string, amount float32) {
 	m.sink.IncrCounter([]string{string(name)}, amount)
 	m.sink.IncrCounterWithLabels([]string{string(name)}, amount, []metrics.Label{{"client", clientId}})
 }

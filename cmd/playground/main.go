@@ -17,8 +17,8 @@ func main() {
 	//
 	//cockpit_stream.CalculateBitmaskProcPerRow(img1, img2, buffer)
 
-	img1, _ := cockpit_stream.OpenPng("test_data/xor_prev.png")
-	img2, _ := cockpit_stream.OpenPng("test_data/xor_next.png")
+	img1, _ := cockpit_stream.OpenPng("output/client2.png")
+	img2, _ := cockpit_stream.OpenPng("output/client2-prev.png")
 
 	buffer := cockpit_stream.NewBufferWithSize(len(img1.Pix))
 
@@ -26,19 +26,8 @@ func main() {
 		start := time.Now()
 		cockpit_stream.CalculateBitmask(img1, img2, buffer)
 		end := time.Now().Sub(start)
-		fmt.Printf("single: %fs -- %dms\n", end.Seconds(), end.Milliseconds())
+		fmt.Printf("single: %fs -- %dms -- %d micro s\n", end.Seconds(), end.Milliseconds(), end.Microseconds())
 
-		start = time.Now()
-		cockpit_stream.CalculateBitmaskProcPerRow(img1, img2, buffer)
-		end = time.Now().Sub(start)
-		fmt.Printf("multi: %fs -- %dms\n", end.Seconds(), end.Milliseconds())
-
-		start = time.Now()
-		cockpit_stream.CalculateBitmask4ProcPerRow(img1, img2, buffer)
-		end = time.Now().Sub(start)
-		fmt.Printf("multi2: %fs -- %dms\n", end.Seconds(), end.Milliseconds())
-
-		fmt.Println("-----------")
 	}
 
 }

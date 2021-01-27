@@ -42,15 +42,16 @@ func NewViewportStreamHandler(id string, container *ViewportContainer, metrics *
 		clientRenderPos: make(map[string]image.Point),
 	}
 }
-
 func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
+	go sch.handle(result)
+}
+
+func (sch *ScreenCaptureHandler) handle(result *CaptureResult) {
 	sch.mutex.Lock()
 	defer sch.mutex.Unlock()
 
 	defer sch.metricsService.MeasureTimeForClient(time.Now(), metrics.MetricSampleViewportHandler, sch.id)
 	ctx, _ := result.GetCaptureContext()
-
-	start := time.Now()
 
 	var wg sync.WaitGroup
 	wg.Add(sch.viewports.Count())
@@ -62,15 +63,11 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 		}
 
 		go func() {
-			startSlice := time.Now()
 			result.Slice(sch.curImage, viewport.PositionRect(), serverViewport.Point())
-			fmt.Printf("[%s] %s slice: %d\n", sch.id, name, time.Now().Sub(startSlice).Milliseconds())
 			wg.Done()
 		}()
 	})
 	wg.Wait()
-	finishSlice := time.Now()
-	fmt.Printf("[%s] finish slice: %d\n", sch.id, finishSlice.Sub(start).Milliseconds())
 
 	if sch.outputImage {
 		SavePng(sch.curImage, path.Join(sch.outputPath, fmt.Sprintf("%s.png", sch.id)))
@@ -80,19 +77,25 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	// compression buffer
 
 	// compute xor mask
-	if err := CalculateBitmask(sch.prevImage, sch.curImage, sch.xorMask); err != nil {
+	changed, err := CalculateBitmask(sch.prevImage, sch.curImage, sch.compressionBuffer)
+	if err != nil {
 		// TODO: handle error
 	}
-	finishMask := time.Now()
-	fmt.Printf("[%s] finish mask: %d\n", sch.id, finishMask.Sub(finishSlice).Milliseconds())
-	// compress mask
-	if _, err := CompressBuffer(sch.xorMask); err != nil {
-		// TODO: handle error
-	}
-	finishCompress := time.Now()
-	fmt.Printf("[%s] finish compress: %d\n", sch.id, finishCompress.Sub(finishMask).Milliseconds())
 
-	fmt.Println("------------------------------------")
+	if changed {
+		// compress mask
+		if _, err := CompressBuffer(sch.compressionBuffer); err != nil {
+			// TODO: handle error
+		}
+
+		sch.metricsService.CountClient(metrics.MetricSampleBandwidth, sch.id, float32(sch.compressionBuffer.Size))
+		sch.metricsService.CountClient(metrics.MetricFrameCounter, sch.id, 1)
+
+	} else {
+		sch.metricsService.CountClient(metrics.MetricSampleBandwidth, sch.id, float32(0))
+		sch.metricsService.CountClient(metrics.MetricFrameCounter, sch.id, 0)
+	}
+
 	// send
 
 	// shuffle screens for reuse
@@ -133,11 +136,11 @@ func (sch *ScreenCaptureHandler) RegisterViewport(name string, posX int, posY in
 	sch.prevImage = newPrevImage
 
 	// create new xor mask
-	sch.xorMask = NewBuffer(newCurImage.Rect.Dx(), newCurImage.Rect.Dy())
+	//sch.xorMask = NewBuffer(newCurImage.Rect.Dx(), newCurImage.Rect.Dy())
 
 	sch.clientRenderPos[name] = image.Point{X: posX, Y: posY}
 
-	sch.compressionBuffer = NewCompressionBuffer(len(sch.xorMask.Bytes))
+	sch.compressionBuffer = NewCompressionBuffer(len(sch.prevImage.Pix))
 
 	return nil
 }

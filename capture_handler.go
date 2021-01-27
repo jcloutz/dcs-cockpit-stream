@@ -9,7 +9,7 @@ type CallbackCaptureHandler struct {
 }
 
 func (ch *CallbackCaptureHandler) Handle(result *CaptureResult) {
-	ch.callback(result)
+	go ch.callback(result)
 }
 
 func (ch *CallbackCaptureHandler) OnReceive(callback func(result *CaptureResult)) {
