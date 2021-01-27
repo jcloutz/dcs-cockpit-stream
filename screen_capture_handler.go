@@ -50,6 +50,8 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	defer sch.metricsService.MeasureTimeForClient(time.Now(), metrics.MetricSampleViewportHandler, sch.id)
 	ctx, _ := result.GetCaptureContext()
 
+	start := time.Now()
+
 	var wg sync.WaitGroup
 	wg.Add(sch.viewports.Count())
 	sch.viewports.Each(func(name string, viewport *Viewport) {
@@ -60,11 +62,15 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 		}
 
 		go func() {
+			startSlice := time.Now()
 			result.Slice(sch.curImage, viewport.PositionRect(), serverViewport.Point())
+			fmt.Printf("[%s] %s slice: %d\n", sch.id, name, time.Now().Sub(startSlice).Milliseconds())
 			wg.Done()
 		}()
 	})
 	wg.Wait()
+	finishSlice := time.Now()
+	fmt.Printf("[%s] finish slice: %d\n", sch.id, finishSlice.Sub(start).Milliseconds())
 
 	if sch.outputImage {
 		SavePng(sch.curImage, path.Join(sch.outputPath, fmt.Sprintf("%s.png", sch.id)))
@@ -77,11 +83,16 @@ func (sch *ScreenCaptureHandler) Handle(result *CaptureResult) {
 	if err := CalculateBitmask(sch.prevImage, sch.curImage, sch.xorMask); err != nil {
 		// TODO: handle error
 	}
+	finishMask := time.Now()
+	fmt.Printf("[%s] finish mask: %d\n", sch.id, finishMask.Sub(finishSlice).Milliseconds())
 	// compress mask
 	if _, err := CompressBuffer(sch.xorMask); err != nil {
 		// TODO: handle error
 	}
+	finishCompress := time.Now()
+	fmt.Printf("[%s] finish compress: %d\n", sch.id, finishCompress.Sub(finishMask).Milliseconds())
 
+	fmt.Println("------------------------------------")
 	// send
 
 	// shuffle screens for reuse

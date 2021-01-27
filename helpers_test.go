@@ -40,7 +40,7 @@ func assertRgbaEqual(t *testing.T, img1, img2 *image.RGBA) {
 	}
 }
 
-func loadPng(t *testing.T, path string) *image.RGBA {
+func loadPng(t testing.TB, path string) *image.RGBA {
 	t.Helper()
 	workingDir, err := os.Getwd()
 	if err != nil {

@@ -1,8 +1,8 @@
 package cockpit_stream
 
 import (
-	"errors"
 	"image"
+	"sync"
 )
 
 type XorBitmask struct {
@@ -16,19 +16,25 @@ func NewXorBitmask(w int, h int) *XorBitmask {
 }
 
 func CalculateBitmask(prev *image.RGBA, next *image.RGBA, buffer *Buffer) error {
-	// bitmask length is same as mask
-	prevLen := len(prev.Pix)
-	nextLen := len(next.Pix)
-	bufferLen := len(buffer.Bytes)
-
-	isValid := prevLen == nextLen && prevLen == bufferLen
-	if !isValid {
-		return errors.New("prev, next, and mask images must be the same size to calculate the xor mask value")
-	}
-
-	for i := 0; i < bufferLen; i++ {
+	for i := 0; i < buffer.Size; i++ {
 		buffer.Bytes[i] = next.Pix[i] ^ prev.Pix[i]
 	}
 
+	return nil
+}
+
+func CalculateBitmaskProcPerRow(prev *image.RGBA, next *image.RGBA, buffer *Buffer) error {
+
+	var wg sync.WaitGroup
+	for rowOffset := 0; rowOffset < buffer.Size/prev.Stride; rowOffset += prev.Stride {
+		wg.Add(1)
+		go func(startIdx int, stride int) {
+			for colOffset := startIdx; colOffset < startIdx+stride; colOffset++ {
+				buffer.Bytes[colOffset] = next.Pix[colOffset] ^ prev.Pix[colOffset]
+			}
+			wg.Done()
+		}(rowOffset, prev.Stride)
+	}
+	wg.Wait()
 	return nil
 }
